@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="hg server" type="GoApplicationRunConfiguration" factoryName="Go Application">
+        <module name="heteroglossia"/>
+        <working_directory value="$PROJECT_DIR$"/>
+        <parameters value="server_example.conf.json"/>
+        <kind value="PACKAGE"/>
+        <package value="github.com/ringo-is-a-color/heteroglossia"/>
+        <directory value="$PROJECT_DIR$"/>
+        <filePath value="$PROJECT_DIR$/main.go"/>
+        <output_directory value="$PROJECT_DIR$"/>
+        <method v="2"/>
+    </configuration>
+</component>

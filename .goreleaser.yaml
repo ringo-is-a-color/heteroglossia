@@ -1,0 +1,23 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -X main.build={{.Version}}
+archives:
+  - files:
+      - none*
+checksum:
+  name_template: 'sha256sums.txt'
