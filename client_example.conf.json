@@ -1,0 +1,56 @@
+{
+  "inbounds" : {
+    "http-socks" : {
+      "host" : "::1",
+      "password" : "password",
+      "port" : 1081,
+      "system-proxy" : false,
+      "username" : "username"
+    }
+  },
+  "misc" : {
+    "hg-binary-auto-update" : false,
+    "rules-files-auto-update" : false,
+    "tls-key-log" : true,
+    "verbose-log" : true
+  },
+  "outbounds" : {
+    "node1" : {
+      "host" : "localhost",
+      "password" : "66cac28e26cd4d6faf944821c702fadb",
+      "tls-cert" : "misc/tls_test_cert.pem",
+      "tls-port" : 1082
+    },
+    "node2" : {
+      "host" : "example.org",
+      "password" : "de6a4bc38b10e27f2da1b67ee81e6147"
+    }
+  },
+  "route" : {
+    "final" : "node1",
+    "rules" : [
+      {
+        "match" : [
+          "domain-full/example.org",
+          "domain-suffix/example.net",
+          "domain-regex/^[.+[.]example.edu]$"
+        ],
+        "policy" : "direct"
+      },
+      {
+        "match" : [
+          "ip/192.0.2.1",
+          "cidr/198.51.100.0/24"
+        ],
+        "policy" : "reject"
+      },
+      {
+        "match" : [
+          "domain-tag/scala",
+          "ip-set-tag/fastly"
+        ],
+        "policy" : "node1"
+      }
+    ]
+  }
+}

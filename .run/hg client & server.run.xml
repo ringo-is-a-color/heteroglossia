@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="hg client &amp; server" type="CompoundRunConfigurationType">
+        <toRun name="hg client" type="GoApplicationRunConfiguration"/>
+        <toRun name="hg server" type="GoApplicationRunConfiguration"/>
+        <method v="2"/>
+    </configuration>
+</component>

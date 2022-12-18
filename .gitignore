@@ -1,0 +1,10 @@
+.idea
+*.iml
+
+data/*
+log/*
+hg_client
+hg_server
+heteroglossia
+
+dist/
