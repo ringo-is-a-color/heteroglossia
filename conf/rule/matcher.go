@@ -27,14 +27,19 @@ const (
 	ipSetTagPrefix     = "ip-set-tag/"
 )
 
-func newMatcher(matchRules []string) (*Matcher, error) {
-	matcher := new(Matcher)
-	matcher.bakedMatchRules = matchRules
-	matcher.domainFullAndSuffixMatcher = newDomainFullAndSuffixMatcher()
+func NewMatcher(matchRules []string) (*Matcher, error) {
+	return &Matcher{domainFullAndSuffixMatcher: newDomainFullAndSuffixMatcher(), bakedMatchRules: matchRules}, nil
+}
+
+func (matcher *Matcher) CopyWithBakedRulesOnly() (*Matcher, error) {
+	return NewMatcher(matcher.bakedMatchRules)
+}
+
+func (matcher *Matcher) SetupRulesData(rulesQueryStore *DomainIPSetRulesQueryStore) error {
 	var domainRegexMatcher []regexp.Regexp
 	var ipSetBuilder netipx.IPSetBuilder
 
-	for _, rule := range matchRules {
+	for _, rule := range matcher.bakedMatchRules {
 		switch {
 		case strings.HasPrefix(rule, domainFullPrefix):
 			domain := strings.TrimPrefix(rule, domainFullPrefix)
@@ -59,82 +64,44 @@ func newMatcher(matchRules []string) (*Matcher, error) {
 
 		case strings.HasPrefix(rule, domainTagPrefix):
 			domainTag := strings.TrimPrefix(rule, domainTagPrefix)
-			domainRules := domainRuleDataPool.Get().(*domainRulesByTagAndType)
-			domainsByType, ok := (*domainRules)[domainTag]
-			domainRuleDataPool.Put(domainRules)
-			if ok == false {
-				return nil, errors.Newf("the domain tag '%v' doesn't exist", domainTag)
-			}
-			appendRegexesCount := 0
-			domainKeywords, ok := domainsByType["keyword"]
-			if ok {
-				appendRegexesCount += len(domainKeywords)
-			}
-			domainRegexes, ok := domainsByType["regex"]
-			if ok {
-				appendRegexesCount += len(domainRegexes)
-			}
-
-			for k, rules := range domainsByType {
-				switch k {
-				case "full":
-					for _, domainFull := range rules {
-						matcher.domainFullAndSuffixMatcher.addDomainFullRule(domainFull)
-					}
-				case "suffix":
-					for _, domainSuffix := range rules {
-						matcher.domainFullAndSuffixMatcher.addDomainFullRule(domainSuffix)
-					}
-				case "keyword":
-					for _, domainKeyword := range rules {
-						regex := regexp.MustCompile(".*" + regexp.QuoteMeta(domainKeyword) + ".*")
-						domainRegexMatcher = append(domainRegexMatcher, *regex)
-					}
-				case "regex":
-					for _, domainRegex := range rules {
-						regex := regexp.MustCompile(domainRegex)
-						domainRegexMatcher = append(domainRegexMatcher, *regex)
-					}
+			err := rulesQueryStore.queryDomainRulesByTag(domainTag, func(domainType domainType, domain string) {
+				switch domainType {
+				case domainFull:
+					matcher.domainFullAndSuffixMatcher.addDomainFullRule(domain)
+				case domainSuffix:
+					matcher.domainFullAndSuffixMatcher.addDomainFullRule(domain)
+				case domainKeyword:
+					regex := regexp.MustCompile("^.*" + regexp.QuoteMeta(domain) + ".*$")
+					domainRegexMatcher = append(domainRegexMatcher, *regex)
+				case domainRegex:
+					regex := regexp.MustCompile(domain)
+					domainRegexMatcher = append(domainRegexMatcher, *regex)
 				}
+			})
+			if err != nil {
+				return err
 			}
 
 		case strings.HasPrefix(rule, ipSetTagPrefix):
 			ipSetTag := strings.TrimPrefix(rule, ipSetTagPrefix)
-			ipSetRules := ipSetRulesDataPool.Get().(*ipSetByTag)
-			cidrs, ok := (*ipSetRules)[ipSetTag]
-			ipSetRulesDataPool.Put(ipSetRules)
-			if ok == false {
-				return nil, errors.Newf("the IP set tag '%v' doesn't exist", ipSetTag)
-			}
-			for _, cidr := range cidrs {
-				size := len(cidr)
-				ip, ok := netip.AddrFromSlice(cidr[:size-1])
-				if !ok {
-					return nil, errors.Newf("invalid IP address length %v in the CIDR %s", size-1, cidr)
-				}
-
-				bits := int(cidr[size-1])
-				if ip.Is4() {
-					bits += 128 - 32
-				}
+			err := rulesQueryStore.queryIpSetRulesByTag(ipSetTag, func(ip netip.Addr, bits int) {
 				ipSetBuilder.AddPrefix(netip.PrefixFrom(to6(ip), bits))
+			})
+			if err != nil {
+				return err
 			}
 		default:
-			return nil, errors.Newf("no matched rule item %v", rule)
+			return errors.Newf("no matched rule item %v", rule)
 		}
 	}
 
 	ipSet, err := ipSetBuilder.IPSet()
 	if err != nil {
-		return nil, errors.Wrap(err, "fail to build the IP set")
+		return errors.Wrap(err, "fail to build the IP set")
 	}
 	matcher.domainRegexMatcher = domainRegexMatcher
 	matcher.ipCidrMatcher = ipSet
-	return matcher, nil
-}
-
-func (matcher *Matcher) NewUpdatedMatcher() (*Matcher, error) {
-	return newMatcher(matcher.bakedMatchRules)
+	return nil
 }
 
 func (matcher *Matcher) MatchDomain(domain string) bool {
@@ -162,7 +129,7 @@ func (matcher *Matcher) UnmarshalJSON(data []byte) error {
 		return errors.Wrap(err, "fail to parse 'match' rules")
 	}
 
-	createdMatcher, err := newMatcher(matchRules)
+	createdMatcher, err := NewMatcher(matchRules)
 	if err != nil {
 		return err
 	}

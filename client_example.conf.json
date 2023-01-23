@@ -10,7 +10,7 @@
   },
   "misc" : {
     "hg-binary-auto-update" : false,
-    "rules-files-auto-update" : false,
+    "rules-file-auto-update" : false,
     "tls-key-log" : true,
     "verbose-log" : true
   },
