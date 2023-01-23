@@ -15,7 +15,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -X main.build={{.Version}}
+      - -s -w -X main.build={{.Version}}
 archives:
   - files:
       - none*
