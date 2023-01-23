@@ -48,8 +48,22 @@ type ProxyNode struct {
 }
 
 type Route struct {
-	Rules []Rule `json:"rules" validate:"dive"`
+	Rules Rules  `json:"rules" validate:"dive"`
 	Final string `json:"final" validate:"required"`
+}
+
+type Rules []Rule
+
+type Rule struct {
+	Matcher *rule.Matcher `json:"match"`
+	Policy  string        `json:"policy" validate:"required"`
+}
+
+type Misc struct {
+	HgBinaryAutoUpdate  bool `json:"hg-binary-auto-update"`
+	RulesFileAutoUpdate bool `json:"rules-file-auto-update"`
+	TLSKeyLog           bool `json:"tls-key-log"`
+	VerboseLog          bool `json:"verbose-log"`
 }
 
 type TLSCertKeyPair struct {
@@ -57,16 +71,35 @@ type TLSCertKeyPair struct {
 	KeyFile  string
 }
 
-type Rule struct {
-	Matcher rule.Matcher `json:"match"`
-	Policy  string       `json:"policy" validate:"required"`
+func (rules *Rules) SetupRulesData() error {
+	store, err := rule.NewDomainIPSetRulesQueryStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	for _, oldRule := range *rules {
+		err := oldRule.Matcher.SetupRulesData(store)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-type Misc struct {
-	HgBinaryAutoUpdate   bool `json:"hg-binary-auto-update"`
-	RulesFilesAutoUpdate bool `json:"rules-files-auto-update"`
-	TLSKeyLog            bool `json:"tls-key-log"`
-	VerboseLog           bool `json:"verbose-log"`
+func (rules *Rules) CopyWithNewRulesData() (Rules, error) {
+	newRules := make([]Rule, 0, len(*rules))
+	for _, oldRule := range *rules {
+		var newRule Rule
+		matcher, err := oldRule.Matcher.CopyWithBakedRulesOnly()
+		if err != nil {
+			return nil, err
+		}
+		newRule.Matcher = matcher
+		newRule.Policy = oldRule.Policy
+		newRules = append(newRules, newRule)
+	}
+	return newRules, nil
 }
 
 const defaultTLSPort = 443

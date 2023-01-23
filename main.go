@@ -27,7 +27,7 @@ func main() {
 	}
 	log.SetVerbose(config.Misc.VerboseLog)
 
-	routeHandler := router.NewHandler(&config.Route, config.Misc.RulesFilesAutoUpdate, config.Outbounds, config.Misc.TLSKeyLog)
+	routeHandler := router.NewHandler(&config.Route, config.Misc.RulesFileAutoUpdate, config.Outbounds, config.Misc.TLSKeyLog)
 	if config.Inbounds.Hg != nil {
 		go func() {
 			err := tls_carrier.ListenRequests(config.Inbounds.Hg, routeHandler)

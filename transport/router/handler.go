@@ -29,7 +29,7 @@ func NewHandler(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[strin
 	router.HTTPClient = getHTTPClientThroughRouter(router)
 	if autoUpdateRuleFiles {
 		go updater.StartUpdateCron(func() {
-			updateRoute(router.HTTPClient, router.route, router.routeRulesRWMutex)
+			router.updateRoute()
 		})
 	}
 	return router
@@ -93,8 +93,8 @@ func (h *Handler) ForwardHandler(accessAddr *transport.SocketAddress) (transport
 	return handler, nil
 }
 
-func updateRoute(client *http.Client, route *conf.Route, routeRulesRWMutex *sync.RWMutex) {
-	success, err := updater.UpdateRulesFiles(client)
+func (h *Handler) updateRoute() {
+	success, err := updater.UpdateRulesFiles(h.HTTPClient)
 	if err != nil {
 		log.InfoWithError("fail to update rules' files", err)
 		return
@@ -103,25 +103,18 @@ func updateRoute(client *http.Client, route *conf.Route, routeRulesRWMutex *sync
 		return
 	}
 
-	newRules := make([]conf.Rule, 0, len(route.Rules))
-	routeRulesRWMutex.RLock()
-	for _, rule := range route.Rules {
-		var newRule conf.Rule
-		matcher, err := rule.Matcher.NewUpdatedMatcher()
-		if err != nil {
-			routeRulesRWMutex.RUnlock()
-			log.InfoWithError("fail to update rules' 'matcher'", err)
-			return
-		}
-		newRule.Matcher = *matcher
-		newRule.Policy = rule.Policy
-		newRules = append(newRules, newRule)
+	h.routeRulesRWMutex.RLock()
+	newRules, err := h.route.Rules.CopyWithNewRulesData()
+	if err != nil {
+		h.routeRulesRWMutex.RUnlock()
+		log.InfoWithError("fail to update rules' 'matcher'", err)
+		return
 	}
-	routeRulesRWMutex.RUnlock()
+	h.routeRulesRWMutex.RUnlock()
 
-	routeRulesRWMutex.Lock()
-	route.Rules = newRules
-	routeRulesRWMutex.Unlock()
+	h.routeRulesRWMutex.Lock()
+	h.route.Rules = newRules
+	h.routeRulesRWMutex.Unlock()
 	log.Info("update rules' files successfully")
 }
 

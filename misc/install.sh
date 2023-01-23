@@ -33,24 +33,16 @@ tar -xzf heteroglossia_0.1.0_linux_amd64.tar.gz
 rm "heteroglossia_${version:1}_${os}_${arch}.tar.gz" LICENSE
 mv heteroglossia hg
 
-read -r -p "Do you want to download the rule files? [y/N] " yN
+read -r -p "Do you want to download the rules' file? [y/N] " yN
 yN=${yN,,}
 if [[ "$yN" =~ ^(y|yes)$ ]]; then
   mkdir -p data
-  echo "Downloading the domain rules' file..."
-  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release//domain-rules.cbor"
-  echo "Downloading the domain rules' sha256sum..."
-  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-rules.cbor.sha256sum"
-  sha256sum -c domain-rules.cbor.sha256sum
-  mv domain-rules.cbor ./data/domain-rules.cbor
-  rm domain-rules.cbor.sha256sum
-  echo "Downloading the ip set rules' file..."
-  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/ip-set-rules.cbor"
-  echo "Downloading the ip set rules' sha256sum..."
-  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/ip-set-rules.cbor.sha256sum"
-  sha256sum -c ip-set-rules.cbor.sha256sum
-  mv ip-set-rules.cbor ./data/ip-set-rules.cbor
-  rm ip-set-rules.cbor.sha256sum
+  echo "Downloading the domain and IP set rules' file 'domain-ip-set-rules.db'..."
+  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db"
+  echo "Downloading the domain and IP set rules' sha256sum..."
+  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db.sha256sum"
+  sha256sum -c domain-ip-set-rules.db.sha256sum
+  rm domain-ip-set-rules.db.sha256sum
 fi
 
 read -r -p "Do you want to generate client & server's example configuration files? [y/N] " yN
