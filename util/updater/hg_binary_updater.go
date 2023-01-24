@@ -21,9 +21,10 @@ const (
 )
 
 func UpdateHgBinary(client *http.Client) (bool, string, error) {
-	//if !semver.IsValid(version) {
-	//	return false, errors.New("the current binary has an invalid semantic version so skipping update")
-	//}
+	currentVersion := cli.GetVersionWithVPrefix()
+	if !semver.IsValid(currentVersion) {
+		return false, "", errors.New("the current binary has an invalid semantic version, so skip the update")
+	}
 	latestTagVersion, err := getLatestTagVersion(client)
 	if err != nil {
 		return false, "", err
@@ -32,7 +33,7 @@ func UpdateHgBinary(client *http.Client) (bool, string, error) {
 		return false, "", errors.New("the latest version from GitHub is an invalid semantic version so skipping update")
 	}
 
-	if semver.Compare(latestTagVersion, cli.Version) > 0 {
+	if semver.Compare(latestTagVersion, currentVersion) > 0 {
 		log.Info("start to update to the latest release version of heteroglossia", "version", latestTagVersion)
 		executablePath, err := os.Executable()
 		if err != nil {
