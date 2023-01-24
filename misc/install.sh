@@ -30,7 +30,7 @@ curl -OL# "https://github.com/ringo-is-a-color/heteroglossia/releases/download/$
 sha256sum --ignore-missing -c sha256sums.txt
 rm sha256sums.txt
 tar -xzf heteroglossia_0.1.0_linux_amd64.tar.gz
-rm "heteroglossia_${version:1}_${os}_${arch}.tar.gz" LICENSE
+rm "heteroglossia_${version:1}_${os}_${arch}.tar.gz"
 mv heteroglossia hg
 
 read -r -p "Do you want to download the rules' file? [y/N] " yN
