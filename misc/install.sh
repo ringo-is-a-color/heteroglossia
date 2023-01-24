@@ -63,8 +63,7 @@ if [[ "$yN" =~ ^(y|yes)$ ]]; then
   "outbounds" : {
     "node1" : {
       "host" : "$domain",
-      "password" : "$password",
-      "tls-port" : 443
+      "password" : "$password"
     }
   }
 }
@@ -77,7 +76,6 @@ END
     "hg" : {
       "host" : "$domain",
       "password" : "$password",
-      "tls-port" : 443,
       "tls-bad-auth-fallback-site-dir" : "site"
     }
   }
