@@ -31,7 +31,7 @@ function download_file_with_progress_bar() {
   if [[ -x "$(command -v wget)" ]]; then
     wget -qN --show-progress "$1"
   else
-    curl -fOL# "$1"
+    curl -fzOL# "$1"
   fi
 }
 
