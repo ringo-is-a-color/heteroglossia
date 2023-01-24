@@ -69,7 +69,7 @@ func (matcher *Matcher) SetupRulesData(rulesQueryStore *DomainIPSetRulesQuerySto
 				case domainFull:
 					matcher.domainFullAndSuffixMatcher.addDomainFullRule(domain)
 				case domainSuffix:
-					matcher.domainFullAndSuffixMatcher.addDomainFullRule(domain)
+					matcher.domainFullAndSuffixMatcher.addDomainSuffixRule(domain)
 				case domainKeyword:
 					regex := regexp.MustCompile("^.*" + regexp.QuoteMeta(domain) + ".*$")
 					domainRegexMatcher = append(domainRegexMatcher, *regex)
