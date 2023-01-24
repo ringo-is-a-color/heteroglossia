@@ -77,7 +77,7 @@ func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*ClientHand
 		osutil.RegisterProgramTerminationHandler(func() {
 			err := os.Remove(tlsKeyLogPath)
 			if err != nil {
-				log.InfoWithError("fail to remove the file", err, "path", tlsKeyLogPath)
+				log.WarnWithError("fail to remove the file", err, "path", tlsKeyLogPath)
 			}
 		})
 	}

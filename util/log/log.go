@@ -19,12 +19,21 @@ func Debug(msg string, args ...any) {
 var Info = slog.Info
 
 func InfoWithError(msg string, err error, args ...any) {
-	slog.Info(msg, append(args, "err", err)...)
+	slog.Warn(msg, append(args, "err", err)...)
 	if verbose.Load() == true {
 		// skip first stack trace which used in 'github.com/ringo-is-a-color/heteroglossia/util/errors' package
 		fmt.Print(xerrors.StackTrace(err)[1:])
 	}
 }
+
+var Warn = slog.Warn
+
+func WarnWithError(msg string, err error, args ...any) {
+	slog.Warn(msg, append(args, "err", err)...)
+	fmt.Print(xerrors.StackTrace(err)[1:])
+}
+
+var Error = slog.Error
 
 func Fatal(msg string, err error, args ...any) {
 	slog.Error(msg, err, args...)

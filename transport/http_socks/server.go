@@ -25,7 +25,7 @@ func ListenRequests(httpSOCKS *conf.HTTPSOCKS, handler transport.ConnectionConti
 		if httpSOCKS.SystemProxy {
 			err := proxy.SetSystemProxy(httpSOCKS.Host, httpSOCKS.Port, authInfo)
 			if err != nil {
-				log.InfoWithError("fail to set system proxy", err)
+				log.WarnWithError("fail to set system proxy", err)
 			}
 		}
 	}, func(conn net.Conn) {

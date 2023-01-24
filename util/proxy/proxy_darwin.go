@@ -19,7 +19,7 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 	osutil.RegisterProgramTerminationHandler(func() {
 		err := disableSystemProxy()
 		if err != nil {
-			log.InfoWithError("fail to disable the macOS system proxy when shutdown", err)
+			log.WarnWithError("fail to disable the macOS system proxy when shutdown", err)
 		}
 	})
 	if authInfo != nil {
