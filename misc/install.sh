@@ -27,14 +27,27 @@ function runCommandWithRootCheck() {
   fi
 }
 
+function download_file_with_progress_bar() {
+  if [[ -x "$(command -v wget)" ]]; then
+    wget -qN --show-progress "$1"
+  else
+    curl -fOL# "$1"
+  fi
+}
+
 mkdir -p hg
 cd hg
 
-version=$(curl -sL https://api.github.com/repos/ringo-is-a-color/heteroglossia/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
-echo "Downloading the latest release version ${version:1} of heteroglossia..."
-curl -OL# "https://github.com/ringo-is-a-color/heteroglossia/releases/download/$version/heteroglossia_${version:1}_${os}_${arch}.tar.gz"
-printf "Downloading the heteroglossia release's sha256sum...\n"
-curl -OL# "https://github.com/ringo-is-a-color/heteroglossia/releases/download/$version/sha256sums.txt"
+if [[ -x "$(command -v wget)" ]]; then
+  version=$(wget -qO- https://api.github.com/repos/ringo-is-a-color/heteroglossia/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+else
+  version=$(curl -fsL https://api.github.com/repos/ringo-is-a-color/heteroglossia/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+fi
+
+echo "Downloading the latest release version ${version:1} of heteroglossia(hg)..."
+download_file_with_progress_bar "https://github.com/ringo-is-a-color/heteroglossia/releases/download/$version/heteroglossia_${version:1}_${os}_${arch}.tar.gz"
+echo "Downloading the heteroglossia(hg) release's sha256sum..."
+download_file_with_progress_bar "https://github.com/ringo-is-a-color/heteroglossia/releases/download/$version/sha256sums.txt"
 sha256sum --ignore-missing -c sha256sums.txt
 rm sha256sums.txt
 tar -xzf heteroglossia_0.1.0_linux_amd64.tar.gz
@@ -45,9 +58,9 @@ read -r -p "Do you want to download the rules' file? [y/N] " yN
 yN=${yN,,}
 if [[ "$yN" =~ ^(y|yes)$ ]]; then
   echo "Downloading the domain and IP set rules' file 'domain-ip-set-rules.db'..."
-  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db"
+  download_file_with_progress_bar "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db"
   echo "Downloading the domain and IP set rules' sha256sum..."
-  curl -OL# "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db.sha256sum"
+  download_file_with_progress_bar "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db.sha256sum"
   sha256sum -c domain-ip-set-rules.db.sha256sum
   rm domain-ip-set-rules.db.sha256sum
 fi
