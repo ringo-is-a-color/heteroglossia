@@ -68,7 +68,8 @@ fi
 read -r -p "Do you want to generate client & server's example configuration files? [y/N] " yN
 yN=${yN,,}
 if [[ "$yN" =~ ^(y|yes)$ ]]; then
-  read -r -p "Please enter your server's domain: " domain
+  read -r -p "Please enter your server's domain [example.com]: " domain
+  domain=${domain:-example.com}
   password=$(openssl rand -hex 16)
   echo "An example of client & server config files are generated."
   echo "'$PWD/client.conf.json'"
