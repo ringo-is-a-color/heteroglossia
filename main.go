@@ -12,7 +12,6 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport/router"
 	"github.com/ringo-is-a-color/heteroglossia/transport/tls_carrier"
 	"github.com/ringo-is-a-color/heteroglossia/util/cli"
-	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
@@ -49,28 +48,26 @@ func main() {
 		go updater.StartUpdateCron(func() {
 			success, latestVersion, err := updater.UpdateHgBinary(routeHandler.HTTPClient)
 			if err != nil {
-				log.InfoWithError("fail to update the hg binary", err)
+				log.WarnWithError("fail to update the hg binary", err)
 			}
 			if !success {
 				return
 			}
 
 			log.Info("update to the latest hg binary successfully", "version", latestVersion)
-			err = selfRestart()
-			if err != nil {
-				log.InfoWithError("fail to restart the new hg binary", err)
-			}
+			selfRestart()
 		})
 	}
 
 	select {}
 }
 
-func selfRestart() error {
+func selfRestart() {
 	log.Info("trying to start the new hg binary")
 	executablePath, err := os.Executable()
 	if err != nil {
-		return errors.WithStack(err)
+		log.Error("fail to get the current hg binary executable path", err)
+		return
 	}
 	// Windows does not support 'syscall.Exec'
 	if //goland:noinspection GoBoolExpressions
@@ -83,10 +80,12 @@ func selfRestart() error {
 		netutil.StopAllListeners()
 		err := cmd.Run()
 		if err != nil {
-			log.Info("fail to start the new hg binary")
-			osutil.Exit(1)
+			log.Fatal("fail to start the new hg binary", err)
 		}
 		osutil.Exit(0)
 	}
-	return syscall.Exec(executablePath, os.Args, os.Environ())
+	err = syscall.Exec(executablePath, os.Args, os.Environ())
+	if err != nil {
+		log.Error("fail to start the new hg binary", err)
+	}
 }

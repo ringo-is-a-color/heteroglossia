@@ -191,7 +191,7 @@ func extractHgBinaryTarGz(tarGzFile *os.File) (string, error) {
 			defer func(file *os.File) {
 				err := file.Close()
 				if err != nil {
-					log.InfoWithError("fail to close the file when extracting", err,
+					log.WarnWithError("fail to close the file when extracting", err,
 						"tar.gz file", tarGzFile.Name(), "uncompressed file name", header.Name)
 				}
 			}(uncompressedFile)
@@ -204,7 +204,7 @@ func extractHgBinaryTarGz(tarGzFile *os.File) (string, error) {
 				newDownloadHgBinaryPath = uncompressedFile.Name()
 			}
 		default:
-			log.Info("unknown type of the header when extracting",
+			log.Warn("unknown type of the header when extracting",
 				"tar.gz file", tarGzFile.Name(), "uncompressed file name", header.Name, "header type", header.Typeflag)
 		}
 	}

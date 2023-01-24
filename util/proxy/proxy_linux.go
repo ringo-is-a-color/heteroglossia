@@ -36,7 +36,7 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy", "use-same-proxy", "true")
 	}
 	if err != nil {
-		log.InfoWithError("fail to set system proxy for Gnome", err)
+		log.WarnWithError("fail to set system proxy for Gnome", err)
 		err = nil
 	}
 
@@ -57,7 +57,7 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 		_, err = cmd.Run("kwriteconfig5", "--file", "kioslaverc", "--group", "Proxy Settings", "--key", "socksProxy", "socks://"+kdeProxyHostWithPort)
 	}
 	if err != nil {
-		log.InfoWithError("fail to set system proxy for KDE 5", err)
+		log.WarnWithError("fail to set system proxy for KDE 5", err)
 	}
 	return nil
 }
@@ -65,13 +65,13 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 func disableSystemProxy() {
 	_, err := cmd.Run("gsettings", "set", "org.gnome.system.proxy", "mode", "none")
 	if err != nil {
-		log.InfoWithError("fail to remove system proxy for Gnome", err)
+		log.WarnWithError("fail to remove system proxy for Gnome", err)
 		err = nil
 	}
 
 	_, err = cmd.Run("kwriteconfig5", "--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType", "0")
 	if err != nil {
-		log.InfoWithError("fail to remove system proxy for KDE 5", err)
+		log.WarnWithError("fail to remove system proxy for KDE 5", err)
 		err = nil
 	}
 }

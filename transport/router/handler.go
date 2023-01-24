@@ -96,7 +96,7 @@ func (h *Handler) ForwardHandler(accessAddr *transport.SocketAddress) (transport
 func (h *Handler) updateRoute() {
 	success, err := updater.UpdateRulesFiles(h.HTTPClient)
 	if err != nil {
-		log.InfoWithError("fail to update rules' files", err)
+		log.WarnWithError("fail to update rules' files", err)
 		return
 	}
 	if !success {
@@ -107,7 +107,7 @@ func (h *Handler) updateRoute() {
 	newRules, err := h.route.Rules.CopyWithNewRulesData()
 	if err != nil {
 		h.routeRulesRWMutex.RUnlock()
-		log.InfoWithError("fail to update rules' 'matcher'", err)
+		log.WarnWithError("fail to update rules' 'matcher'", err)
 		return
 	}
 	h.routeRulesRWMutex.RUnlock()
