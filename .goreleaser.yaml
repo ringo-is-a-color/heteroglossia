@@ -15,7 +15,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.build={{.Version}}
+      - -s -w -X github.com/ringo-is-a-color/heteroglossia/util/cli.version={{.Version}}
 archives:
   - files:
       - none*
