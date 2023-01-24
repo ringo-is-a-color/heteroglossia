@@ -26,14 +26,32 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 	if err == nil {
 		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.http", "port", portStr)
 	}
-	if err == nil {
-		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.http", "port", portStr)
+	if authInfo.IsEmpty() {
+		if err == nil {
+			_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.http", "use-authentication", "false")
+		}
+	} else {
+		if err == nil {
+			_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.http", "authentication-user", authInfo.Username)
+		}
+		if err == nil {
+			_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.http", "authentication-password", authInfo.Password)
+		}
+		if err == nil {
+			_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.http", "use-authentication", "true")
+		}
 	}
 	if err == nil {
-		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.http", "port", portStr)
+		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.https", "host", host)
 	}
 	if err == nil {
-		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy", "use-same-proxy", "true")
+		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.https", "port", portStr)
+	}
+	if err == nil {
+		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.socks", "host", host)
+	}
+	if err == nil {
+		_, err = cmd.Run("gsettings", "set", "org.gnome.system.proxy.socks", "port", portStr)
 	}
 	if err != nil {
 		log.WarnWithError("fail to set system proxy for Gnome", err)
