@@ -70,6 +70,13 @@ yN=${yN,,}
 if [[ "$yN" =~ ^(y|yes)$ ]]; then
   read -r -p "Please enter your server's domain [example.com]: " domain
   domain=${domain:-example.com}
+  read -r -p "Do you want to update the heteroglossia(hg) binary file to latest version automatically when running? [y/N] " yN
+  yN=${yN,,}
+  if [[ "$yN" =~ ^(y|yes)$ ]]; then
+    auto_update="true"
+  else
+    auto_update="false"
+  fi
   password=$(openssl rand -hex 16)
   echo "An example of client & server config files are generated."
   echo "'$PWD/client.conf.json'"
@@ -86,6 +93,9 @@ if [[ "$yN" =~ ^(y|yes)$ ]]; then
       "host" : "$domain",
       "password" : "$password"
     }
+  },
+  "misc" : {
+    "hg-binary-auto-update" : $auto_update
   }
 }
 END
@@ -99,6 +109,9 @@ END
       "password" : "$password",
       "tls-bad-auth-fallback-site-dir" : "site"
     }
+  },
+  "misc" : {
+    "hg-binary-auto-update" : $auto_update
   }
 }
 END
