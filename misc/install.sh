@@ -28,20 +28,20 @@ function runCommandWithRootCheck() {
 }
 
 function download_file_with_progress_bar() {
-  if [[ -x "$(command -v wget)" ]]; then
-    wget -qN --show-progress "$1"
+  if [[ -x "$(command -v curl)" ]]; then
+    curl -fOL# "$1"
   else
-    curl -fzOL# "$1"
+    wget -N --no-verbose --show-progress "$1"
   fi
 }
 
 mkdir -p hg
 cd hg
 
-if [[ -x "$(command -v wget)" ]]; then
-  version=$(wget -qO- https://api.github.com/repos/ringo-is-a-color/heteroglossia/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
-else
+if [[ -x "$(command -v curl)" ]]; then
   version=$(curl -fsL https://api.github.com/repos/ringo-is-a-color/heteroglossia/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+else
+  version=$(wget -qO- https://api.github.com/repos/ringo-is-a-color/heteroglossia/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
 fi
 
 echo "Downloading the latest release version ${version:1} of heteroglossia(hg)..."
