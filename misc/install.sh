@@ -70,7 +70,7 @@ yN=${yN,,}
 if [[ "$yN" =~ ^(y|yes)$ ]]; then
   read -r -p "Please enter your server's domain [example.com]: " domain
   domain=${domain:-example.com}
-  read -r -p "Do you want to update the heteroglossia(hg) binary file to latest version automatically when running? [y/N] " yN
+  read -r -p "Do you want to enable the auto-update for the heteroglossia(hg) binary file in the configuration files though it might cause some problems if there are some breaking changes or bugs in a newer version? [y/N] " yN
   yN=${yN,,}
   if [[ "$yN" =~ ^(y|yes)$ ]]; then
     auto_update="true"
