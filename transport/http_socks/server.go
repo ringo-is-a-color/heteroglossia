@@ -23,9 +23,10 @@ func ListenRequests(httpSOCKS *conf.HTTPSOCKS, handler transport.ConnectionConti
 	authInfo := &transport.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
 	return netutil.ListenTCPAndAccept(addr, func() {
 		if httpSOCKS.SystemProxy {
+			log.Info("try to set the system proxy")
 			err := proxy.SetSystemProxy(httpSOCKS.Host, httpSOCKS.Port, authInfo)
 			if err != nil {
-				log.WarnWithError("fail to set system proxy", err)
+				log.WarnWithError("fail to set the system proxy", err)
 			}
 		}
 	}, func(conn net.Conn) {
