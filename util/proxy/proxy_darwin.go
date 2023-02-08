@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 
@@ -24,41 +25,41 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 			log.WarnWithError("fail to disable the macOS system proxy when shutdown", err)
 		}
 	})
+	var proxySetCommand string
+	portStr := strconv.Itoa(int(port))
 	if authInfo.IsEmpty() {
-		_, err = cmd.Run("networksetup", "-setwebproxy", serviceName, host, strconv.Itoa(int(port)), "off")
-		if err == nil {
-			_, err = cmd.Run("networksetup", "-setsecurewebproxy", serviceName, host, strconv.Itoa(int(port)), "off")
-		}
-		if err == nil {
-			_, err = cmd.Run("networksetup", "-setsocksfirewallproxy", serviceName, host, strconv.Itoa(int(port)), "off")
-		}
+		proxySetCommand = fmt.Sprintf(trimNewLinesForRawStringLiteral(`networksetup -setwebproxy %[1]v %[2]v %[3]v off && 
+networksetup -setsecurewebproxy %[1]v %[2]v %[3]v off && 
+networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v off`),
+			serviceName, host, portStr, authInfo.Username, authInfo.Password)
 	} else {
-		_, err = cmd.Run("networksetup", "-setwebproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
-		if err == nil {
-			_, err = cmd.Run("networksetup", "-setsecurewebproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
-		}
-		if err == nil {
-			_, err = cmd.Run("networksetup", "-setsocksfirewallproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
-		}
+		proxySetCommand = fmt.Sprintf(trimNewLinesForRawStringLiteral(`networksetup -setwebproxy %[1]v %[2]v %[3]v on %[4]v %[5]v && 
+networksetup -setsecurewebproxy %[1]v %[2]v %[3]v on %[4]v %[5]v && 
+networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v on %[4]v %[5]v`),
+			serviceName, host, portStr, authInfo.Username, authInfo.Password)
 	}
+	_, err = cmd.Run("/bin/sh", "-c", proxySetCommand)
 	return err
 }
 
 func unsetSystemProxy(serviceName, proxyHost string, hasAuthInfo bool) error {
 	log.Info("try to unset the system proxy")
-	_, err := cmd.Run("networksetup", "-setwebproxystate", serviceName, "off")
-	if err == nil {
-		_, err = cmd.Run("networksetup", "-setsecurewebproxystate", serviceName, "off")
-	}
-	if err == nil {
-		_, err = cmd.Run("networksetup", "-setsocksfirewallproxystate", serviceName, "off")
-	}
+	proxyUnSetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`networksetup -setwebproxy %[1]v '' '' off && 
+networksetup -setsecurewebproxy %[1]v '' '' off && 
+networksetup -setsocksfirewallproxy %[1]v '' '' off &&
+networksetup -setwebproxystate %[1]v off && 
+networksetup -setsecurewebproxystate %[1]v off && 
+networksetup -setsocksfirewallproxystate %[1]v off`),
+		serviceName)
+	_, err := cmd.Run("/bin/sh", "-c", proxyUnSetCommand)
 	if hasAuthInfo {
 		// see https://apple.stackexchange.com/a/351729
 		// delete account info three times for HTTP/HTTPS/SOCKS proxy
-		_, _ = cmd.Run("security", "delete-internet-password", "-s", proxyHost)
-		_, _ = cmd.Run("security", "delete-internet-password", "-s", proxyHost)
-		_, _ = cmd.Run("security", "delete-internet-password", "-s", proxyHost)
+		proxyAuthInfoUnSetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`security delete-internet-password -s %[1]v && 
+security delete-internet-password -s %[1]v && 
+security delete-internet-password -s %[1]v`),
+			proxyHost)
+		_, _ = cmd.Run("/bin/sh", "-c", proxyAuthInfoUnSetCommand)
 	}
 	return err
 }
