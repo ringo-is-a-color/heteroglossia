@@ -11,27 +11,20 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
 )
 
+// not work when macOS's 'System Settings -> VPN' is enabled
+
 func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) error {
 	serviceName, err := getCurrentNetworkServiceName()
 	if err != nil {
 		return err
 	}
 	osutil.RegisterProgramTerminationHandler(func() {
-		err := disableSystemProxy()
+		err := unsetSystemProxy(serviceName, host, !authInfo.IsEmpty())
 		if err != nil {
 			log.WarnWithError("fail to disable the macOS system proxy when shutdown", err)
 		}
 	})
-	if authInfo != nil {
-		_, err = cmd.Run("networksetup", "-setwebproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
-		if err == nil {
-			_, err = cmd.Run("networksetup", "-setsecurewebproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
-		}
-		if err == nil {
-			_, err = cmd.Run("networksetup", "-setsocksfirewallproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
-		}
-	} else {
-		// It seems the macOS 13 has a bug that it fails to turn off the auth from my testing
+	if authInfo.IsEmpty() {
 		_, err = cmd.Run("networksetup", "-setwebproxy", serviceName, host, strconv.Itoa(int(port)), "off")
 		if err == nil {
 			_, err = cmd.Run("networksetup", "-setsecurewebproxy", serviceName, host, strconv.Itoa(int(port)), "off")
@@ -39,24 +32,33 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 		if err == nil {
 			_, err = cmd.Run("networksetup", "-setsocksfirewallproxy", serviceName, host, strconv.Itoa(int(port)), "off")
 		}
+	} else {
+		_, err = cmd.Run("networksetup", "-setwebproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
+		if err == nil {
+			_, err = cmd.Run("networksetup", "-setsecurewebproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
+		}
+		if err == nil {
+			_, err = cmd.Run("networksetup", "-setsocksfirewallproxy", serviceName, host, strconv.Itoa(int(port)), "on", authInfo.Username, authInfo.Password)
+		}
 	}
 	return err
 }
 
-func disableSystemProxy() error {
-	// always disable the current macOS network service's system proxy
-	// instead of disabling the previous set one
-	serviceName, err := getCurrentNetworkServiceName()
-	if err != nil {
-		return err
-	}
-
-	_, err = cmd.Run("networksetup", "-setwebproxystate", serviceName, "off")
+func unsetSystemProxy(serviceName, proxyHost string, hasAuthInfo bool) error {
+	log.Info("try to unset the system proxy")
+	_, err := cmd.Run("networksetup", "-setwebproxystate", serviceName, "off")
 	if err == nil {
 		_, err = cmd.Run("networksetup", "-setsecurewebproxystate", serviceName, "off")
 	}
 	if err == nil {
 		_, err = cmd.Run("networksetup", "-setsocksfirewallproxystate", serviceName, "off")
+	}
+	if hasAuthInfo {
+		// see https://apple.stackexchange.com/a/351729
+		// delete account info three times for HTTP/HTTPS/SOCKS proxy
+		_, _ = cmd.Run("security", "delete-internet-password", "-s", proxyHost)
+		_, _ = cmd.Run("security", "delete-internet-password", "-s", proxyHost)
+		_, _ = cmd.Run("security", "delete-internet-password", "-s", proxyHost)
 	}
 	return err
 }
