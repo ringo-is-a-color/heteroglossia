@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/cmd"
@@ -19,7 +18,7 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 	portStr := strconv.Itoa(int(port))
 	// https://developer-old.gnome.org/ProxyConfiguration/
 	// org.gnome.system.proxy use-same-proxy and org.gnome.system.proxy.http enabled are not used so don't use them
-	gnomeProxySetCommand := fmt.Sprintf(trimNewLine(`gsettings set org.gnome.system.proxy mode 'manual' && 
+	gnomeProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`gsettings set org.gnome.system.proxy mode 'manual' && 
 gsettings set org.gnome.system.proxy.http host '%[1]v' && 
 gsettings set org.gnome.system.proxy.http port %[2]v && 
 gsettings set org.gnome.system.proxy.http authentication-password '%[4]v' && 
@@ -47,7 +46,7 @@ gsettings set org.gnome.system.proxy.socks port %[2]v`),
 	} else {
 		kdeProxyHostWithPort = fmt.Sprintf("%v:%v@%v %v", url.QueryEscape(authInfo.Username), url.QueryEscape(authInfo.Password), host, strconv.Itoa(int(port)))
 	}
-	kde5ProxySetCommand := fmt.Sprintf(trimNewLine(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
+	kde5ProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy '%v' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '%v' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy '%v'`),
@@ -61,7 +60,7 @@ kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy '%v'`)
 
 func unsetSystemProxy() {
 	log.Info("try to unset the system proxy")
-	gnomeProxyUnsetCommand := trimNewLine(`gsettings set org.gnome.system.proxy mode 'none' && 
+	gnomeProxyUnsetCommand := trimNewLinesForRawStringLiteral(`gsettings set org.gnome.system.proxy mode 'none' && 
 gsettings set org.gnome.system.proxy.http host '8080' && 
 gsettings set org.gnome.system.proxy.http port 0 && 
 gsettings set org.gnome.system.proxy.http authentication-password '' && 
@@ -80,7 +79,7 @@ gsettings set org.gnome.system.proxy.socks port 0`)
 		log.Info("standard error output (which might be expected) when running commands to unset the system proxy for Gnome", "stderr", stderr)
 	}
 
-	kde5ProxyUnsetCommand := trimNewLine(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 0 && 
+	kde5ProxyUnsetCommand := trimNewLinesForRawStringLiteral(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 0 && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy '' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy ''`)
@@ -89,8 +88,4 @@ kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy ''`)
 		log.WarnWithError("fail to remove the system proxy for KDE 5", err)
 		err = nil
 	}
-}
-
-func trimNewLine(s string) string {
-	return strings.ReplaceAll(s, "\n", "")
 }
