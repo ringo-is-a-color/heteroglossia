@@ -8,19 +8,21 @@ import (
 )
 
 func Run(name string, arg ...string) (string, error) {
-	cmd, outputBuilder, errorBuilder := exec.Command(name, arg...), new(strings.Builder), new(strings.Builder)
-	cmd.Stdout = outputBuilder
-	cmd.Stderr = errorBuilder
+	cmd, outBuilder, errBuilder := exec.Command(name, arg...), new(strings.Builder), new(strings.Builder)
+	cmd.Stdout = outBuilder
+	cmd.Stderr = errBuilder
 	err := cmd.Run()
+	stdout := outBuilder.String()
+	stderr := errBuilder.String()
 	if err != nil {
-		return "", errors.Wrapf(err, "error '%v' when running command '%v %v'", errorBuilder.String(),
-			name, strings.Join(arg, " "))
+		return "", errors.Wrapf(err, "standard output '%v' and standard error '%v' when running the command '%v %v'",
+			stdout, stderr, name, strings.Join(arg, " "))
 	}
-	if errorBuilder.Len() > 0 {
-		return "", errors.Newf("error '%v' when running command '%v %v'", errorBuilder.String(),
-			name, strings.Join(arg, " "))
+	if errBuilder.Len() > 0 {
+		return "", errors.Newf("standard output '%v' and standard error '%v' when running the command '%v %v'",
+			stdout, stderr, name, strings.Join(arg, " "))
 	}
-	return outputBuilder.String(), nil
+	return outBuilder.String(), nil
 }
 
 func RunWithStdoutErrResults(name string, arg ...string) (string, string, error) {

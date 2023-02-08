@@ -14,7 +14,7 @@ import (
 
 func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) error {
 	osutil.RegisterProgramTerminationHandler(func() {
-		disableSystemProxy()
+		unsetSystemProxy()
 	})
 	portStr := strconv.Itoa(int(port))
 	// https://developer-old.gnome.org/ProxyConfiguration/
@@ -47,20 +47,21 @@ gsettings set org.gnome.system.proxy.socks port %[2]v`),
 	} else {
 		kdeProxyHostWithPort = fmt.Sprintf("%v:%v@%v %v", url.QueryEscape(authInfo.Username), url.QueryEscape(authInfo.Password), host, strconv.Itoa(int(port)))
 	}
-	kde5ProxySetupCommand := fmt.Sprintf(trimNewLine(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
+	kde5ProxySetCommand := fmt.Sprintf(trimNewLine(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy '%v' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '%v' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy '%v'`),
 		"http://"+kdeProxyHostWithPort, "http://"+kdeProxyHostWithPort, "socks://"+kdeProxyHostWithPort)
-	_, err = cmd.Run("/bin/sh", "-c", kde5ProxySetupCommand)
+	_, err = cmd.Run("/bin/sh", "-c", kde5ProxySetCommand)
 	if err != nil {
 		log.WarnWithError("fail to set system proxy for KDE 5", err)
 	}
 	return nil
 }
 
-func disableSystemProxy() {
-	gnomeProxyResetCommand := trimNewLine(`gsettings set org.gnome.system.proxy mode 'none' && 
+func unsetSystemProxy() {
+	log.Info("try to unset the system proxy")
+	gnomeProxyUnsetCommand := trimNewLine(`gsettings set org.gnome.system.proxy mode 'none' && 
 gsettings set org.gnome.system.proxy.http host '8080' && 
 gsettings set org.gnome.system.proxy.http port 0 && 
 gsettings set org.gnome.system.proxy.http authentication-password '' && 
@@ -70,20 +71,20 @@ gsettings set org.gnome.system.proxy.https host '' &&
 gsettings set org.gnome.system.proxy.https port 0 && 
 gsettings set org.gnome.system.proxy.socks host '' && 
 gsettings set org.gnome.system.proxy.socks port 0`)
-	_, stderr, err := cmd.RunWithStdoutErrResults("dbus-run-session", "--", "/bin/sh", "-c", gnomeProxyResetCommand)
+	_, stderr, err := cmd.RunWithStdoutErrResults("dbus-run-session", "--", "/bin/sh", "-c", gnomeProxyUnsetCommand)
 	if err != nil {
 		log.WarnWithError("fail to remove the system proxy for Gnome", err)
 		err = nil
 	}
 	if stderr != "" {
-		log.Info("standard error output (which might be expected) when running commands to reset the system proxy for Gnome", "stderr", stderr)
+		log.Info("standard error output (which might be expected) when running commands to unset the system proxy for Gnome", "stderr", stderr)
 	}
 
-	kde5ProxyResetCommand := trimNewLine(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 0 && 
+	kde5ProxyUnsetCommand := trimNewLine(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 0 && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy '' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '' && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy ''`)
-	_, err = cmd.Run("/bin/sh", "-c", kde5ProxyResetCommand)
+	_, err = cmd.Run("/bin/sh", "-c", kde5ProxyUnsetCommand)
 	if err != nil {
 		log.WarnWithError("fail to remove the system proxy for KDE 5", err)
 		err = nil
