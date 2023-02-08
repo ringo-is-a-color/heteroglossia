@@ -18,24 +18,39 @@ import (
 
 func ListenRequests(httpSOCKS *conf.HTTPSOCKS, handler transport.ConnectionContinuationHandler) error {
 	// can't listen to IPv4 & IPv6 together due to https://github.com/golang/go/issues/9334
+	// so also listen to IPv4 one when using ::1 or ::
 	var host = httpSOCKS.Host
-	addr := net.JoinHostPort(host, strconv.Itoa(int(httpSOCKS.Port)))
 	authInfo := &transport.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
-	return netutil.ListenTCPAndAccept(addr, func() {
-		if httpSOCKS.SystemProxy {
-			log.Info("try to set the system proxy")
-			err := proxy.SetSystemProxy(httpSOCKS.Host, httpSOCKS.Port, authInfo)
-			if err != nil {
-				log.WarnWithError("fail to set the system proxy", err)
-			}
-		}
-	}, func(conn net.Conn) {
+	var ipv4RequestsHandlerForDualstack func() error
+	connHandler := func(conn net.Conn) {
 		err := handleRequest(conn, authInfo, handler)
 		_ = conn.Close()
 		if err != nil {
 			log.InfoWithError("fail to handle a HTTP/SOCKS request", err)
 		}
-	})
+	}
+
+	if host == "::1" {
+		ipv4Localhost := net.JoinHostPort("127.0.0.1", strconv.Itoa(int(httpSOCKS.Port)))
+		ipv4RequestsHandlerForDualstack = func() error {
+			return netutil.ListenTCPAndAccept(ipv4Localhost, nil, connHandler)
+		}
+	} else if host == "::" {
+		host = ""
+	}
+
+	addr := net.JoinHostPort(host, strconv.Itoa(int(httpSOCKS.Port)))
+	return parRunWithFirstErrReturn(func() error {
+		return netutil.ListenTCPAndAccept(addr, func() {
+			if httpSOCKS.SystemProxy {
+				log.Info("try to set the system proxy")
+				err := proxy.SetSystemProxy(httpSOCKS.Host, httpSOCKS.Port, authInfo)
+				if err != nil {
+					log.WarnWithError("fail to set the system proxy", err)
+				}
+			}
+		}, connHandler)
+	}, ipv4RequestsHandlerForDualstack)
 }
 
 func handleRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler transport.ConnectionContinuationHandler) error {
@@ -56,4 +71,27 @@ func handleRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler
 		bufReader := bufio.NewReaderSize(&ioutil.BytesReadPreloadReadWriteCloser{Preload: []byte{b}, RWC: conn}, 256)
 		return http.HandleRequest(conn, bufReader, authInfo, handler)
 	}
+}
+
+func parRunWithFirstErrReturn(f1 func() error, f2 func() error) error {
+	if f1 == nil {
+		return f2()
+	}
+	if f2 == nil {
+		return f1()
+	}
+
+	ch := make(chan error, 1)
+	go func() {
+		ch <- f1()
+	}()
+	go func() {
+		ch <- f2()
+	}()
+
+	err := <-ch
+	if err != nil {
+		return err
+	}
+	return <-ch
 }

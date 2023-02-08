@@ -29,15 +29,15 @@ func DialTCP(addr string) (*net.TCPConn, error) {
 	return tcpConn, nil
 }
 
-func ListenTCPAndAccept(addr string, afterListenCallback func(), connHandler func(conn net.Conn)) error {
+func ListenTCPAndAccept(addr string, listenSuccessCallback func(), connHandler func(conn net.Conn)) error {
 	ln, err := listenConfig.Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	defer closeListener(ln)
 	addListener(ln)
-	if afterListenCallback != nil {
-		afterListenCallback()
+	if listenSuccessCallback != nil {
+		listenSuccessCallback()
 	}
 	return accept(ln, connHandler)
 }
