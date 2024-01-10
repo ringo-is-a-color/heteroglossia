@@ -33,6 +33,9 @@ networksetup -setsecurewebproxy %[1]v %[2]v %[3]v off &&
 networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v off`),
 			serviceName, host, portStr, authInfo.Username, authInfo.Password)
 	} else {
+		// try to unset the auth info for system proxy
+		// may unset the auth info configured by user or other apps
+		unsetAuthInfo(host)
 		proxySetCommand = fmt.Sprintf(trimNewLinesForRawStringLiteral(`networksetup -setwebproxy %[1]v %[2]v %[3]v on %[4]v %[5]v && 
 networksetup -setsecurewebproxy %[1]v %[2]v %[3]v on %[4]v %[5]v && 
 networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v on %[4]v %[5]v`),
@@ -53,15 +56,19 @@ networksetup -setsocksfirewallproxystate %[1]v off`),
 		serviceName)
 	_, err := cmd.Run("/bin/sh", "-c", proxyUnSetCommand)
 	if hasAuthInfo {
-		// see https://apple.stackexchange.com/a/351729
-		// delete account info three times for HTTP/HTTPS/SOCKS proxy
-		proxyAuthInfoUnSetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`security delete-internet-password -s %[1]v && 
-security delete-internet-password -s %[1]v && 
-security delete-internet-password -s %[1]v`),
-			proxyHost)
-		_, _ = cmd.Run("/bin/sh", "-c", proxyAuthInfoUnSetCommand)
+		unsetAuthInfo(proxyHost)
 	}
 	return err
+}
+
+func unsetAuthInfo(proxyHost string) {
+	// see https://apple.stackexchange.com/a/351729
+	// delete the auth info three times for HTTP/HTTPS/SOCKS proxy
+	proxyAuthInfoUnSetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`security delete-internet-password -s %[1]v && 
+security delete-internet-password -s %[1]v && 
+security delete-internet-password -s %[1]v`),
+		proxyHost)
+	_, _ = cmd.Run("/bin/sh", "-c", proxyAuthInfoUnSetCommand)
 }
 
 func getCurrentNetworkServiceName() (string, error) {
