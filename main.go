@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"syscall"
 
 	"github.com/ringo-is-a-color/heteroglossia/conf"
@@ -26,6 +28,14 @@ func main() {
 	}
 	log.SetVerbose(config.Misc.VerboseLog)
 
+	if config.Misc.Profiling {
+		go func() {
+			err := netutil.ListenHTTPAndServe(":"+strconv.Itoa(config.Misc.ProfilingPort), nil)
+			if err != nil {
+				log.Error("fail to start the profiling server", err)
+			}
+		}()
+	}
 	routeHandler := router.NewHandler(&config.Route, config.Misc.RulesFileAutoUpdate, config.Outbounds, config.Misc.TLSKeyLog)
 	if config.Inbounds.Hg != nil {
 		go func() {

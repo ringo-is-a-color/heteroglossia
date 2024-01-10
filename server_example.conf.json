@@ -9,6 +9,8 @@
     }
   },
   "misc": {
+    "profiling" : true,
+    "profiling-port" : 6062,
     "verbose-log": true
   }
 }
