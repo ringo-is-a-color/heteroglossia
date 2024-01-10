@@ -24,6 +24,8 @@ type Handler struct {
 	HTTPClient        *http.Client
 }
 
+var _ transport.ConnectionContinuationHandler = &Handler{}
+
 func NewHandler(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[string]*conf.ProxyNode, tlsKeyLog bool) *Handler {
 	router := &Handler{route, new(sync.RWMutex), outbounds, tlsKeyLog, nil}
 	router.HTTPClient = getHTTPClientThroughRouter(router)

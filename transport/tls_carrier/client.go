@@ -29,6 +29,8 @@ type ClientHandler struct {
 	passwordWithCRLF [16]byte
 }
 
+var _ transport.ConnectionContinuationHandler = &ClientHandler{}
+
 func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*ClientHandler, error) {
 	clientHandler := &ClientHandler{proxyNode: proxyNode}
 	if proxyNode.TLSCertFile == "" {

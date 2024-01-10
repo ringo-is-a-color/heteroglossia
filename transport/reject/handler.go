@@ -10,6 +10,8 @@ import (
 
 type Handler struct{}
 
+var _ transport.ConnectionContinuationHandler = &Handler{}
+
 func (h *Handler) CreateConnection(_ *transport.SocketAddress) (net.Conn, error) {
 	return nil, errors.New("Connection rejected")
 }

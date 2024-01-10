@@ -13,6 +13,8 @@ type DuplexPipe struct {
 	w *io.PipeWriter
 }
 
+var _ io.ReadWriteCloser = &DuplexPipe{}
+
 func NewDuplexPipe() (*DuplexPipe, *DuplexPipe) {
 	lr, lw := io.Pipe()
 	rr, rw := io.Pipe()

@@ -12,6 +12,8 @@ import (
 
 type TCPReplayHandler struct{}
 
+var _ transport.ConnectionContinuationHandler = &TCPReplayHandler{}
+
 func (_ *TCPReplayHandler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
 	return netutil.DialTCP(accessAddr.ToHostStr())
 }
