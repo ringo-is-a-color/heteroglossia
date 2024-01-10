@@ -128,7 +128,6 @@ func removeHopByHopHeaders(header http.Header) {
 	delete(header, "Trailers")
 	delete(header, "Transfer-Encoding")
 	delete(header, "Upgrade")
-
 }
 
 func httpError(req *http.Request, w io.Writer, statusCode int) error {
