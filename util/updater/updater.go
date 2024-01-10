@@ -171,7 +171,7 @@ func extractHgBinaryTarGz(tarGzFile *os.File) (string, error) {
 
 		if err == io.EOF {
 			if newDownloadHgBinaryPath == "" {
-				return "", errors.Newf("fail to find the hg binary in the downloaded compressed file &v",
+				return "", errors.Newf("fail to find the hg binary in the downloaded compressed file %v",
 					tarGzFile.Name())
 			}
 			return newDownloadHgBinaryPath, nil
