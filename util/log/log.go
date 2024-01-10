@@ -2,12 +2,12 @@ package log
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"sync/atomic"
 
 	"github.com/mdobak/go-xerrors"
 	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
-	"golang.org/x/exp/slog"
 )
 
 var verbose = atomic.Bool{}
@@ -36,14 +36,14 @@ func WarnWithError(msg string, err error, args ...any) {
 var Error = slog.Error
 
 func Fatal(msg string, err error, args ...any) {
-	slog.Error(msg, err, args...)
+	slog.Error(msg, append(args, "err", err)...)
 	osutil.Exit(1)
 }
 
 func SetVerbose(b bool) {
 	verbose.Store(b)
-	handlerOptions := slog.HandlerOptions{
+	handlerOptions := &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}
-	slog.SetDefault(slog.New(handlerOptions.NewTextHandler(os.Stdout)))
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, handlerOptions)))
 }
