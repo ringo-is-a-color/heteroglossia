@@ -10,6 +10,8 @@
   },
   "misc" : {
     "hg-binary-auto-update" : false,
+    "profiling" : true,
+    "profiling-port" : 6061,
     "rules-file-auto-update" : false,
     "tls-key-log" : true,
     "verbose-log" : true

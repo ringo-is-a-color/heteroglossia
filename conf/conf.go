@@ -64,6 +64,8 @@ type Misc struct {
 	RulesFileAutoUpdate bool `json:"rules-file-auto-update"`
 	TLSKeyLog           bool `json:"tls-key-log"`
 	VerboseLog          bool `json:"verbose-log"`
+	Profiling           bool `json:"profiling"`
+	ProfilingPort       int  `json:"profiling-port" validate:"gte=0,lte=65536"`
 }
 
 type TLSCertKeyPair struct {
@@ -102,10 +104,19 @@ func (rules *Rules) CopyWithNewRulesData() (Rules, error) {
 	return newRules, nil
 }
 
+const defaultHTTPSOCKSPort = 1080
 const defaultTLSPort = 443
+const defaultProfilingPort = 6060
+
+func (httpSOCKS *HTTPSOCKS) UnmarshalJSON(data []byte) error {
+	// https://stackoverflow.com/a/41102996
+	type HTTPSOCKSAlias HTTPSOCKS
+	httpSOCKSAlias := (*HTTPSOCKSAlias)(httpSOCKS)
+	httpSOCKSAlias.Port = defaultHTTPSOCKSPort
+	return json.Unmarshal(data, httpSOCKSAlias)
+}
 
 func (hg *Hg) UnmarshalJSON(data []byte) error {
-	// https://stackoverflow.com/a/41102996
 	type HgAlias Hg
 	hgAlias := (*HgAlias)(hg)
 	hgAlias.TLSPort = defaultTLSPort
