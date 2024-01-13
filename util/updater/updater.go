@@ -81,7 +81,7 @@ func updateFile(client *http.Client, filePath, fileURL, fileSHA256SumURL string)
 
 	// only remove SHA256Sum file finally, so we could check these files when an error occurs
 	_ = os.Remove(files[1].Name())
-	err = copyFile(srcFile, filePath)
+	err = replaceFile(srcFile, filePath)
 	if err != nil {
 		return err
 	}
@@ -204,26 +204,20 @@ func extractHgBinaryTarGz(tarGzFile *os.File) (string, error) {
 	}
 }
 
-func copyFile(src *os.File, dst string) error {
-	var dstFilePath string
-	var err error
-	if filepath.IsAbs(dst) {
-		dstFilePath = dst
-	}
-
-	err = os.MkdirAll(filepath.Dir(dstFilePath), 0755)
+func replaceFile(src *os.File, dstFilepath string) error {
+	err := os.MkdirAll(filepath.Dir(dstFilepath), 0755)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	dstNewFile, err := os.Create(dstFilePath + ".new")
+	dstNewFilepath, err := os.Create(dstFilepath + ".new")
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	defer func(dstFile *os.File) {
 		_ = dstFile.Close()
-	}(dstNewFile)
-	_, err = io.Copy(dstNewFile, src)
+	}(dstNewFilepath)
+	_, err = io.Copy(dstNewFilepath, src)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -231,18 +225,18 @@ func copyFile(src *os.File, dst string) error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	err = os.Chmod(dstNewFile.Name(), srcFileStat.Mode())
+	err = os.Chmod(dstNewFilepath.Name(), srcFileStat.Mode())
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	if runtime.GOOS == "windows" {
-		err = os.Rename(dstFilePath, dstFilePath+".old")
+		err = os.Rename(dstFilepath, dstFilepath+".old")
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return errors.WithStack(err)
 		}
 	}
-	err = os.Rename(dstFilePath+".new", dstFilePath)
+	err = os.Rename(dstFilepath+".new", dstFilepath)
 	if err != nil {
 		return errors.WithStack(err)
 	}
