@@ -91,6 +91,7 @@ var CRLF = []byte{'\r', '\n'}
 func (handler *ClientHandler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
 	headerLen := 16 + 2 + socksLikeRequestSize(accessAddr)
 	bs := make([]byte, 0, headerLen)
+	// use a buffer as a view for bytes
 	buf := bytes.NewBuffer(bs)
 	buf.Write(handler.passwordWithCRLF[:])
 	buf.Write(CRLF)
@@ -103,10 +104,6 @@ func (handler *ClientHandler) CreateConnection(accessAddr *transport.SocketAddre
 	}
 	tlsConn := tls.Client(conn, handler.tlsConfig)
 
-	_, err = buf.WriteTo(buf)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
 	return &ioutil.BytesReadPreloadConn{Preload: bs[:headerLen], Conn: tlsConn}, nil
 }
 
@@ -122,6 +119,7 @@ func (handler *ClientHandler) ForwardConnection(srcRWC io.ReadWriteCloser, acces
 	if err != nil {
 		return errors.WithStack(err)
 	}
+	//
 	buf := bytes.NewBuffer(pooledBs[:0:headerLen])
 	buf.Write(handler.passwordWithCRLF[:])
 	buf.Write(CRLF)
