@@ -2,7 +2,6 @@ package http_socks
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os/exec"
@@ -14,10 +13,6 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport/direct"
 	"github.com/stretchr/testify/assert"
 )
-
-func init() {
-	go startWebServer(webServerPort)
-}
 
 const (
 	proxyServerAddr = "[::1]:2080"
@@ -32,6 +27,10 @@ var (
 	authInfo      = &transport.HTTPSOCKSAuthInfo{Username: "username", Password: "password"}
 	wrongAuthInfo = &transport.HTTPSOCKSAuthInfo{Username: "username", Password: "password1"}
 )
+
+func init() {
+	go startWebServer(webServerPort)
+}
 
 func TestProxyConnectionHandle(t *testing.T) {
 	proxyProtocolInfo := []struct {
@@ -132,7 +131,7 @@ func startClient(authInfo *transport.HTTPSOCKSAuthInfo) error {
 
 func startWebServer(listenPort string) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, "Hello, World!")
+		w.WriteHeader(http.StatusNoContent)
 	})
 	_ = http.ListenAndServe(listenPort, nil)
 }
