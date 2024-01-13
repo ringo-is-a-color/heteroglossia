@@ -2,6 +2,7 @@ package conf
 
 import (
 	"encoding/json"
+	stdErrors "errors"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -45,14 +46,16 @@ func Parse(configFilePath string) (*Config, error) {
 
 	err = validate.Struct(config)
 	if err != nil {
-		errs := err.(validator.ValidationErrors)
-		if len(errs) > 0 {
-			validatedError := errors.Newf("error: fail to parse the config file %v", configFilePath)
-			for _, err := range errs {
-				fieldName := err.Namespace()[strings.Index(err.Namespace(), ".")+1:]
-				validatedError = errors.Join(validatedError, errors.Newf("  the '%v' field should be '%v'", fieldName, err.ActualTag()))
+		var errs validator.ValidationErrors
+		if stdErrors.As(err, &errs) {
+			if len(errs) > 0 {
+				validatedError := errors.Newf("error: fail to parse the config file %v", configFilePath)
+				for _, err := range errs {
+					fieldName := err.Namespace()[strings.Index(err.Namespace(), ".")+1:]
+					validatedError = errors.Join(validatedError, errors.Newf("  the '%v' field should be '%v'", fieldName, err.ActualTag()))
+				}
+				return nil, validatedError
 			}
-			return nil, validatedError
 		}
 	}
 	resolveAllFilePathsToConfigFolder(config, filepath.Dir(configFilePath))
