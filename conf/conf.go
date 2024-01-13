@@ -73,15 +73,15 @@ type TLSCertKeyPair struct {
 	KeyFile  string
 }
 
-func (rules *Rules) SetupRulesData() error {
+func (rules Rules) SetupRulesData() error {
 	store, err := rule.NewDomainIPSetRulesQueryStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	for _, oldRule := range *rules {
-		err := oldRule.Matcher.SetupRulesData(store)
+	for _, rulee := range rules {
+		err := rulee.Matcher.SetupRulesData(store)
 		if err != nil {
 			return err
 		}
@@ -89,17 +89,19 @@ func (rules *Rules) SetupRulesData() error {
 	return nil
 }
 
-func (rules *Rules) CopyWithNewRulesData() (Rules, error) {
-	newRules := make([]Rule, 0, len(*rules))
-	for _, oldRule := range *rules {
+func (rules Rules) CopyWithNewRulesData() (Rules, error) {
+	newRules := make([]Rule, 0, len(rules))
+	for _, oldRule := range rules {
 		var newRule Rule
-		matcher, err := oldRule.Matcher.CopyWithBakedRulesOnly()
-		if err != nil {
-			return nil, err
-		}
+		matcher := oldRule.Matcher.CopyWithBakedRulesOnly()
 		newRule.Matcher = matcher
 		newRule.Policy = oldRule.Policy
 		newRules = append(newRules, newRule)
+	}
+
+	err := Rules(newRules).SetupRulesData()
+	if err != nil {
+		return nil, err
 	}
 	return newRules, nil
 }
