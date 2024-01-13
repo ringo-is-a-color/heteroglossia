@@ -27,8 +27,6 @@ func Wrapf(err error, format string, a ...any) error {
 	return xerrors.New(err, fmt.Sprintf(format, a...))
 }
 
-// TODO
-
 var Join = xerrors.Append
 
 var Is = errors.Is
