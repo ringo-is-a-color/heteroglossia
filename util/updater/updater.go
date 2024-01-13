@@ -19,17 +19,11 @@ import (
 
 	"github.com/ringo-is-a-color/heteroglossia/util/cli"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
-	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 )
 
-func needUpdateFile(fileRelPathFromExecutablePath string, needUpdateInterval time.Duration) (bool, error) {
-	ruleFilePath, err := ioutil.GetPathFromExecutablePath(fileRelPathFromExecutablePath)
-	if err != nil {
-		return false, err
-	}
-
-	ruleFileInfo, err := os.Stat(ruleFilePath)
+func needUpdateFile(filepath string, needUpdateInterval time.Duration) (bool, error) {
+	ruleFileInfo, err := os.Stat(filepath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return true, nil
@@ -120,7 +114,7 @@ func downloadFile(client *http.Client, url string) (*os.File, error) {
 	return file, nil
 }
 
-func verifyRulesFileSHA256Sum(file *os.File, sha256SumFile *os.File, fileName string) error {
+func verifyRulesFileSHA256Sum(file *os.File, sha256SumFile *os.File, filename string) error {
 	hash := sha256.New()
 	_, err := io.Copy(hash, file)
 	if err != nil {
@@ -133,7 +127,7 @@ func verifyRulesFileSHA256Sum(file *os.File, sha256SumFile *os.File, fileName st
 	downloadFileSum := hex.EncodeToString(hash.Sum(nil))
 
 	scanner := bufio.NewScanner(sha256SumFile)
-	regexString := fmt.Sprintf("^([^\\s]+)%v%v$", "\\s+", regexp.QuoteMeta(fileName))
+	regexString := fmt.Sprintf("^([^\\s]+)%v%v$", "\\s+", regexp.QuoteMeta(filename))
 	regex := regexp.MustCompile(regexString)
 	expectedSum := ""
 	for scanner.Scan() {
@@ -144,7 +138,7 @@ func verifyRulesFileSHA256Sum(file *os.File, sha256SumFile *os.File, fileName st
 		}
 	}
 	if expectedSum == "" {
-		return errors.Newf("fail to find the SHA256 sum for the '%v' file", fileName)
+		return errors.Newf("fail to find the SHA256 sum for the '%v' file", filename)
 	}
 
 	if downloadFileSum != expectedSum {
@@ -215,11 +209,6 @@ func copyFile(src *os.File, dst string) error {
 	var err error
 	if filepath.IsAbs(dst) {
 		dstFilePath = dst
-	} else {
-		dstFilePath, err = ioutil.GetPathFromExecutablePath(dst)
-		if err != nil {
-			return err
-		}
 	}
 
 	err = os.MkdirAll(filepath.Dir(dstFilePath), 0755)

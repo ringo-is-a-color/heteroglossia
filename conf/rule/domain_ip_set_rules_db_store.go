@@ -3,16 +3,16 @@ package rule
 import (
 	"database/sql"
 	"net/netip"
+	"os"
 
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
-	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	_ "modernc.org/sqlite"
 )
 
 type domainType int
 
 const (
-	DomainIPSetRulesDBFilePathFromExecutable = "domain-ip-set-rules.db"
+	DomainIPSetRulesDBFilename = "domain-ip-set-rules.db"
 
 	domainFull    = 0
 	domainSuffix  = 1
@@ -40,11 +40,13 @@ type DomainIPSetRulesQueryStore struct {
 }
 
 func NewDomainIPSetRulesQueryStore() (*DomainIPSetRulesQueryStore, error) {
-	dbPath, err := ioutil.GetPathFromExecutablePath(DomainIPSetRulesDBFilePathFromExecutable)
+	// sql.Open doesn't check file existence, so we check it manually
+	_, err := os.Stat(DomainIPSetRulesDBFilename)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
-	db, err := sql.Open("sqlite", dbPath)
+
+	db, err := sql.Open("sqlite", DomainIPSetRulesDBFilename)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
