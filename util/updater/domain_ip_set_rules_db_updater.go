@@ -16,7 +16,7 @@ const (
 )
 
 func UpdateRulesFiles(client *http.Client) (bool, error) {
-	update, err := needUpdateFile(rule.DomainIPSetRulesDBFilePathFromExecutable, rulesFileNeedUpdateInterval)
+	update, err := needUpdateFile(rule.DomainIPSetRulesDBFilename, rulesFileNeedUpdateInterval)
 	if err != nil {
 		return false, err
 	}
@@ -33,5 +33,5 @@ func UpdateRulesFiles(client *http.Client) (bool, error) {
 
 func updateRulesFiles(client *http.Client) error {
 	log.Info("start to update rules' files")
-	return updateFile(client, rule.DomainIPSetRulesDBFilePathFromExecutable, domainIPSetRulesFileURL, domainIPSetRulesFileSHA256SumURL)
+	return updateFile(client, rule.DomainIPSetRulesDBFilename, domainIPSetRulesFileURL, domainIPSetRulesFileSHA256SumURL)
 }

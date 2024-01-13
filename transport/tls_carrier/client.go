@@ -31,6 +31,8 @@ type ClientHandler struct {
 
 var _ transport.ConnectionContinuationHandler = &ClientHandler{}
 
+const tlsKeyLogFilepath = "logs/tls_key.log"
+
 func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*ClientHandler, error) {
 	clientHandler := &ClientHandler{proxyNode: proxyNode}
 	if proxyNode.TLSCertFile == "" {
@@ -63,23 +65,19 @@ func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*ClientHand
 	}
 
 	if tlsKeyLog {
-		tlsKeyLogPath, err := ioutil.GetPathFromExecutablePath("logs/tls_key_log")
-		if err != nil {
-			return nil, err
-		}
-		err = os.MkdirAll(path.Dir(tlsKeyLogPath), 0700)
+		err := os.MkdirAll(path.Dir(tlsKeyLogFilepath), 0700)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
-		tlsKeyLogFile, err := os.OpenFile(tlsKeyLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		tlsKeyLogFile, err := os.OpenFile(tlsKeyLogFilepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
 			return nil, err
 		}
 		clientHandler.tlsConfig.KeyLogWriter = tlsKeyLogFile
 		osutil.RegisterProgramTerminationHandler(func() {
-			err := os.Remove(tlsKeyLogPath)
+			err := os.Remove(tlsKeyLogFilepath)
 			if err != nil {
-				log.WarnWithError("fail to remove the file", err, "path", tlsKeyLogPath)
+				log.WarnWithError("fail to remove the file", err, "path", tlsKeyLogFilepath)
 			}
 		})
 	}

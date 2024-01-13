@@ -19,14 +19,6 @@ func ReadFile(filePath string) ([]byte, error) {
 	return bs, errors.WithStack(err)
 }
 
-func GetPathFromExecutablePath(filePath string) (string, error) {
-	executablePath, err := os.Executable()
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-	return filepath.Join(filepath.Dir(executablePath), filePath), nil
-}
-
 func Read1(r io.Reader) (byte, error) {
 	var bs [1]byte
 	_, err := io.ReadFull(r, bs[:])
