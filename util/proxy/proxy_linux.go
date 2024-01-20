@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/cmd"
@@ -15,7 +16,6 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 	osutil.RegisterProgramTerminationHandler(func() {
 		unsetSystemProxy()
 	})
-	portStr := strconv.Itoa(int(port))
 	// https://developer-old.gnome.org/ProxyConfiguration/
 	// org.gnome.system.proxy use-same-proxy and org.gnome.system.proxy.http enabled are not used so don't use them
 	gnomeProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`gsettings set org.gnome.system.proxy mode 'manual' && 
@@ -28,7 +28,7 @@ gsettings set org.gnome.system.proxy.https host '%[1]v' &&
 gsettings set org.gnome.system.proxy.https port %[2]v && 
 gsettings set org.gnome.system.proxy.socks host '%[1]v' && 
 gsettings set org.gnome.system.proxy.socks port %[2]v`),
-		host, portStr, strconv.FormatBool(!authInfo.IsEmpty()), authInfo.Username, authInfo.Password)
+		host, port, strconv.FormatBool(!authInfo.IsEmpty()), authInfo.Username, authInfo.Password)
 	// use 'dbus-run-session' command to invoke the `gsettings` commands otherwise it won't work
 	// due to https://askubuntu.com/q/276509
 	_, stderr, err := cmd.RunWithStdoutErrResults("dbus-run-session", "--", "/bin/sh", "-c", gnomeProxySetCommand)
@@ -40,11 +40,15 @@ gsettings set org.gnome.system.proxy.socks port %[2]v`),
 		log.Info("standard error output (which might be expected) when running commands to set system proxy for Gnome", "stderr", stderr)
 	}
 
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
 	var kdeProxyHostWithPort string
 	if authInfo.IsEmpty() {
-		kdeProxyHostWithPort = fmt.Sprintf("%v %v", host, portStr)
+		kdeProxyHostWithPort = fmt.Sprintf("%v:%v", host, port)
 	} else {
-		kdeProxyHostWithPort = fmt.Sprintf("%v:%v@%v %v", url.QueryEscape(authInfo.Username), url.QueryEscape(authInfo.Password), host, strconv.Itoa(int(port)))
+		// there is a KDE bug that it fails to set a URL including both auth info and IPv6 address (e.g. http://username:password@[::1]:1080
+		kdeProxyHostWithPort = fmt.Sprintf("%v:%v@%v:%v", url.QueryEscape(authInfo.Username), url.QueryEscape(authInfo.Password), host, port)
 	}
 	kde5ProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
 kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy '%v' && 

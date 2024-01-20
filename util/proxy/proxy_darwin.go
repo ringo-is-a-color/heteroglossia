@@ -3,7 +3,6 @@ package proxy
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/cmd"
@@ -26,12 +25,11 @@ func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthI
 		}
 	})
 	var proxySetCommand string
-	portStr := strconv.Itoa(int(port))
 	if authInfo.IsEmpty() {
 		proxySetCommand = fmt.Sprintf(trimNewLinesForRawStringLiteral(`networksetup -setwebproxy %[1]v %[2]v %[3]v off && 
 networksetup -setsecurewebproxy %[1]v %[2]v %[3]v off && 
 networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v off`),
-			serviceName, host, portStr, authInfo.Username, authInfo.Password)
+			serviceName, host, port, authInfo.Username, authInfo.Password)
 	} else {
 		// try to unset the auth info for system proxy
 		// may unset the auth info configured by user or other apps
@@ -39,7 +37,7 @@ networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v off`),
 		proxySetCommand = fmt.Sprintf(trimNewLinesForRawStringLiteral(`networksetup -setwebproxy %[1]v %[2]v %[3]v on %[4]v %[5]v && 
 networksetup -setsecurewebproxy %[1]v %[2]v %[3]v on %[4]v %[5]v && 
 networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v on %[4]v %[5]v`),
-			serviceName, host, portStr, authInfo.Username, authInfo.Password)
+			serviceName, host, port, authInfo.Username, authInfo.Password)
 	}
 	_, err = cmd.Run("/bin/sh", "-c", proxySetCommand)
 	return err
