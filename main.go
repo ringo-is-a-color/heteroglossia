@@ -5,6 +5,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -26,6 +27,13 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
+	configFileDir := filepath.Dir(cli.Parse().ConfigFile)
+	err = os.Chdir(configFileDir)
+	if err != nil {
+		log.WarnWithError("fail to change the current working directory to '%v'", err, configFileDir)
+	}
+
 	log.SetVerbose(config.Misc.VerboseLog)
 
 	if config.Misc.Profiling {

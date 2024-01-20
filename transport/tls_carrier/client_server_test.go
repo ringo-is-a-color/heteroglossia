@@ -2,6 +2,7 @@ package tls_carrier
 
 import (
 	"bufio"
+	_ "github.com/flashlabs/rootpath"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
