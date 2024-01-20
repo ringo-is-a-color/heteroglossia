@@ -2,13 +2,13 @@ package tls_carrier
 
 import (
 	"bufio"
-	_ "github.com/flashlabs/rootpath"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"testing"
 
+	_ "github.com/flashlabs/rootpath"
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/transport/direct"

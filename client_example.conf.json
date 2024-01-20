@@ -1,57 +1,57 @@
 {
-  "inbounds" : {
-    "http-socks" : {
-      "host" : "::1",
-      "password" : "password",
-      "port" : 1081,
-      "system-proxy" : false,
-      "username" : "username"
+  "inbounds": {
+    "http-socks": {
+      "host": "::1",
+      "port": 1081,
+      "username": "username",
+      "password": "password",
+      "system-proxy": false
     }
   },
-  "misc" : {
-    "hg-binary-auto-update" : false,
-    "profiling" : true,
-    "profiling-port" : 6061,
-    "rules-file-auto-update" : false,
-    "tls-key-log" : true,
-    "verbose-log" : true
+  "misc": {
+    "hg-binary-auto-update": false,
+    "profiling": true,
+    "profiling-port": 6061,
+    "rules-file-auto-update": false,
+    "tls-key-log": true,
+    "verbose-log": true
   },
-  "outbounds" : {
-    "node1" : {
-      "host" : "localhost",
-      "password" : "66cac28e26cd4d6faf944821c702fadb",
-      "tls-cert" : "misc/tls_test_cert.pem",
-      "tls-port" : 1082
+  "outbounds": {
+    "node1": {
+      "host": "localhost",
+      "password": "66cac28e26cd4d6faf944821c702fadb",
+      "tls-cert": "misc/tls_test_cert.pem",
+      "tls-port": 1082
     },
-    "node2" : {
-      "host" : "example.org",
-      "password" : "de6a4bc38b10e27f2da1b67ee81e6147"
+    "node2": {
+      "host": "example.org",
+      "password": "de6a4bc38b10e27f2da1b67ee81e6147"
     }
   },
-  "route" : {
-    "final" : "node1",
-    "rules" : [
+  "route": {
+    "final": "node1",
+    "rules": [
       {
-        "match" : [
+        "match": [
           "domain-full/example.org",
           "domain-suffix/example.net",
           "domain-regex/^[.+[.]example.edu]$"
         ],
-        "policy" : "direct"
+        "policy": "direct"
       },
       {
-        "match" : [
+        "match": [
           "ip/192.0.2.1",
           "cidr/198.51.100.0/24"
         ],
-        "policy" : "reject"
+        "policy": "reject"
       },
       {
-        "match" : [
+        "match": [
           "domain-tag/scala",
           "ip-set-tag/fastly"
         ],
-        "policy" : "node1"
+        "policy": "node1"
       }
     ]
   }
