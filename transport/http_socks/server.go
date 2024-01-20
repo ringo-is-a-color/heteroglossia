@@ -36,6 +36,7 @@ func ListenRequests(httpSOCKS *conf.HTTPSOCKS, handler transport.ConnectionConti
 			return netutil.ListenTCPAndAccept(ipv4Localhost, nil, connHandler)
 		}
 	} else if host == "::" {
+		// the Golang will listen both IPv4 & IPv6 when using the empty string for host
 		host = ""
 	}
 
