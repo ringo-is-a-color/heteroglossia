@@ -20,7 +20,7 @@ func TestClientServerConnection(t *testing.T) {
 	assert.Nil(t, err)
 	if serverConf.Inbounds.Hg != nil {
 		go func() {
-			err := ListenRequests(serverConf.Inbounds.Hg, new(direct.TCPReplayHandler))
+			err := ListenRequests(serverConf.Inbounds.Hg, new(direct.Handler))
 			assert.Nil(t, err)
 		}()
 	}

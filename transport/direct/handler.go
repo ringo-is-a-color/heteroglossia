@@ -10,16 +10,16 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
-type TCPReplayHandler struct{}
+type Handler struct{}
 
-var _ transport.ConnectionContinuationHandler = &TCPReplayHandler{}
+var _ transport.ConnectionContinuationHandler = new(Handler)
 
-func (_ *TCPReplayHandler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
+func (_ *Handler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
 	return netutil.DialTCP(accessAddr.ToHostStr())
 }
 
-func (handler *TCPReplayHandler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
-	targetConn, err := handler.CreateConnection(accessAddr)
+func (h *Handler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
+	targetConn, err := h.CreateConnection(accessAddr)
 	if err != nil {
 		return errors.WithStack(err)
 	}

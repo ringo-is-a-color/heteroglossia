@@ -9,68 +9,72 @@ import (
 )
 
 type BytesReadPreloadConn struct {
-	Preload []byte
-	Conn    net.Conn
+	preload []byte
+	conn    net.Conn
 }
 
-var _ net.Conn = &BytesReadPreloadConn{}
-var _ io.ReaderFrom = &BytesReadPreloadConn{}
-var _ io.WriterTo = &BytesReadPreloadConn{}
+var _ net.Conn = new(BytesReadPreloadConn)
+var _ io.ReaderFrom = new(BytesReadPreloadConn)
+var _ io.WriterTo = new(BytesReadPreloadConn)
+
+func NewBytesReadPreloadConn(preload []byte, conn net.Conn) *BytesReadPreloadConn {
+	return &BytesReadPreloadConn{preload, conn}
+}
 
 func (conn *BytesReadPreloadConn) Read(p []byte) (n int, err error) {
-	return conn.Conn.Read(p)
+	return conn.conn.Read(p)
 }
 
 func (conn *BytesReadPreloadConn) Write(p []byte) (n int, err error) {
-	if conn.Preload != nil {
-		pooledBs := pool.Get(len(conn.Preload) + len(p))[:0]
-		defer pool.Put(pooledBs)
-		pooledBs = append(pooledBs, conn.Preload...)
-		pooledBs = append(pooledBs, p...)
-		conn.Preload = nil
-		return conn.Conn.Write(pooledBs)
+	if conn.preload != nil {
+		bs := pool.Get(len(conn.preload) + len(p))[:0]
+		defer pool.Put(bs)
+		bs = append(bs, conn.preload...)
+		bs = append(bs, p...)
+		conn.preload = nil
+		return conn.conn.Write(bs)
 	}
-	return conn.Conn.Write(p)
+	return conn.conn.Write(p)
 }
 
 func (conn *BytesReadPreloadConn) Close() error {
-	conn.Preload = nil
-	return conn.Conn.Close()
+	conn.preload = nil
+	return conn.conn.Close()
 }
 
 func (conn *BytesReadPreloadConn) LocalAddr() net.Addr {
-	return conn.Conn.LocalAddr()
+	return conn.conn.LocalAddr()
 }
 
 func (conn *BytesReadPreloadConn) RemoteAddr() net.Addr {
-	return conn.Conn.RemoteAddr()
+	return conn.conn.RemoteAddr()
 }
 
 func (conn *BytesReadPreloadConn) SetDeadline(t time.Time) error {
-	return conn.Conn.SetDeadline(t)
+	return conn.conn.SetDeadline(t)
 }
 
 func (conn *BytesReadPreloadConn) SetReadDeadline(t time.Time) error {
-	return conn.Conn.SetReadDeadline(t)
+	return conn.conn.SetReadDeadline(t)
 }
 
 func (conn *BytesReadPreloadConn) SetWriteDeadline(t time.Time) error {
-	return conn.Conn.SetWriteDeadline(t)
+	return conn.conn.SetWriteDeadline(t)
 }
 
 func (conn *BytesReadPreloadConn) ReadFrom(r io.Reader) (n int64, err error) {
-	if conn.Preload != nil {
-		n, err := conn.Conn.Write(conn.Preload)
-		conn.Preload = nil
+	if conn.preload != nil {
+		n, err := conn.conn.Write(conn.preload)
+		conn.preload = nil
 		if err != nil {
 			return int64(n), err
 		}
-		n2, err := io.Copy(conn.Conn, r)
+		n2, err := io.Copy(conn.conn, r)
 		return int64(n) + n2, err
 	}
-	return io.Copy(conn.Conn, r)
+	return io.Copy(conn.conn, r)
 }
 
 func (conn *BytesReadPreloadConn) WriteTo(w io.Writer) (n int64, err error) {
-	return io.Copy(w, conn.Conn)
+	return io.Copy(w, conn.conn)
 }

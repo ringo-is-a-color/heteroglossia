@@ -135,7 +135,6 @@ func (matcher *Matcher) UnmarshalJSON(data []byte) error {
 }
 
 // due to https://github.com/golang/go/issues/54365
-
 func to6(addr netip.Addr) netip.Addr {
 	if addr.Is4() {
 		return netip.AddrFrom16(addr.As16())

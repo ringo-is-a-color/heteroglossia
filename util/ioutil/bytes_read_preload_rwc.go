@@ -5,54 +5,57 @@ import (
 )
 
 type BytesReadPreloadReadWriteCloser struct {
-	Preload []byte
-	RWC     io.ReadWriteCloser
+	preload []byte
+	rwc     io.ReadWriteCloser
 }
 
-var _ io.ReadWriteCloser = &BytesReadPreloadReadWriteCloser{}
-var _ io.ReaderFrom = &BytesReadPreloadReadWriteCloser{}
-var _ io.WriterTo = &BytesReadPreloadReadWriteCloser{}
+var _ io.ReadWriteCloser = new(BytesReadPreloadReadWriteCloser)
+var _ io.ReaderFrom = new(BytesReadPreloadReadWriteCloser)
+var _ io.WriterTo = new(BytesReadPreloadReadWriteCloser)
+
+func NewBytesReadPreloadReadWriteCloser(preload []byte, rwc io.ReadWriteCloser) *BytesReadPreloadReadWriteCloser {
+	return &BytesReadPreloadReadWriteCloser{preload, rwc}
+}
 
 func (rwc *BytesReadPreloadReadWriteCloser) Read(p []byte) (n int, err error) {
-	if rwc.Preload != nil {
-		n = copy(p, rwc.Preload)
-		preloadLen := len(rwc.Preload)
+	if rwc.preload != nil {
+		n = copy(p, rwc.preload)
+		preloadLen := len(rwc.preload)
 		if n == preloadLen {
-			rwc.Preload = nil
+			rwc.preload = nil
 		} else {
-			rwc.Preload = rwc.Preload[n:]
+			rwc.preload = rwc.preload[n:]
 		}
-		if n < len(p) {
-			n2, err := rwc.RWC.Read(p[n:])
-			return n + n2, err
-		}
+		// return directly because the documentation says:
+		// If some data is available but not len(p) bytes, Read conventionally
+		// returns what is available instead of waiting for more.
 		return n, nil
 	}
-	return rwc.RWC.Read(p)
+	return rwc.rwc.Read(p)
 }
 
 func (rwc *BytesReadPreloadReadWriteCloser) Write(p []byte) (n int, err error) {
-	return rwc.RWC.Write(p)
+	return rwc.rwc.Write(p)
 }
 
 func (rwc *BytesReadPreloadReadWriteCloser) Close() error {
-	rwc.Preload = nil
-	return rwc.RWC.Close()
+	rwc.preload = nil
+	return rwc.rwc.Close()
 }
 
 func (rwc *BytesReadPreloadReadWriteCloser) ReadFrom(r io.Reader) (n int64, err error) {
-	return io.Copy(rwc.RWC, r)
+	return io.Copy(rwc.rwc, r)
 }
 
 func (rwc *BytesReadPreloadReadWriteCloser) WriteTo(w io.Writer) (n int64, err error) {
-	if rwc.Preload != nil {
-		n, err := w.Write(rwc.Preload)
-		rwc.Preload = nil
+	if rwc.preload != nil {
+		n, err := w.Write(rwc.preload)
+		rwc.preload = nil
 		if err != nil {
 			return int64(n), err
 		}
-		n2, err := io.Copy(w, rwc.RWC)
+		n2, err := io.Copy(w, rwc.rwc)
 		return int64(n) + n2, err
 	}
-	return io.Copy(w, rwc.RWC)
+	return io.Copy(w, rwc.rwc)
 }

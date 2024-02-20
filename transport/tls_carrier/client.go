@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/binary"
 	"encoding/pem"
 	"io"
 	"net"
@@ -23,18 +22,18 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
 )
 
-type ClientHandler struct {
+type Handler struct {
 	proxyNode        *conf.ProxyNode
 	tlsConfig        *tls.Config
 	passwordWithCRLF [16]byte
 }
 
-var _ transport.ConnectionContinuationHandler = &ClientHandler{}
+var _ transport.ConnectionContinuationHandler = new(Handler)
 
 const tlsKeyLogFilepath = "logs/tls_key.log"
 
-func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*ClientHandler, error) {
-	clientHandler := &ClientHandler{proxyNode: proxyNode}
+func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*Handler, error) {
+	clientHandler := &Handler{proxyNode: proxyNode}
 	if proxyNode.TLSCertFile == "" {
 		clientHandler.tlsConfig = &tls.Config{
 			ServerName: proxyNode.Host,
@@ -88,44 +87,55 @@ func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*ClientHand
 
 var CRLF = []byte{'\r', '\n'}
 
-func (handler *ClientHandler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
-	headerLen := 16 + 2 + socksLikeRequestSize(accessAddr)
-	bs := make([]byte, 0, headerLen)
+func (h *Handler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
+	headerSize := 16 + 2 + socksLikeRequestSizeInBytes(accessAddr)
+	bs := make([]byte, 0, headerSize)
 	// use a buffer as a view for bytes
 	buf := bytes.NewBuffer(bs)
-	buf.Write(handler.passwordWithCRLF[:])
+	buf.Write(h.passwordWithCRLF[:])
 	buf.Write(CRLF)
 	writeSocksLikeConnectionCommandRequest(buf, accessAddr)
 
-	hostWithPort := handler.proxyNode.Host + ":" + strconv.Itoa(handler.proxyNode.TLSPort)
+	hostWithPort := h.proxyNode.Host + ":" + strconv.Itoa(h.proxyNode.TLSPort)
 	conn, err := netutil.DialTCP(hostWithPort)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail to connect to the TLS server %v", hostWithPort)
 	}
-	tlsConn := tls.Client(conn, handler.tlsConfig)
+	tlsConn := tls.Client(conn, h.tlsConfig)
 
-	return &ioutil.BytesReadPreloadConn{Preload: bs[:headerLen], Conn: tlsConn}, nil
+	return ioutil.NewBytesReadPreloadConn(bs[:headerSize], tlsConn), nil
 }
 
-// https://superuser.com/a/1652039
+/*
+https://trojan-gfw.github.io/trojan/protocol
 
-const TCPMss = 1448
++-----------------------+---------+----------------+---------+----------+
+| hex(SHA224(password)) |  CRLF   | Trojan Request |  CRLF   | Payload  |
++-----------------------+---------+----------------+---------+----------+
+|          56           | X'0D0A' |    Variable    | X'0D0A' | Variable |
++-----------------------+---------+----------------+---------+----------+
+*/
 
-func (handler *ClientHandler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
+func (h *Handler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
 	// len(password) + len(CRLF) = 16 + 2
-	headerLen := 16 + 2 + socksLikeRequestSize(accessAddr)
-	pooledBs := pool.Get(TCPMss)
-	n, err := srcRWC.Read(pooledBs[headerLen:])
+	headerSize := 16 + 2 + socksLikeRequestSizeInBytes(accessAddr)
+	firstPacketBs := pool.Get(ioutil.TCPBufSize)
+	pooledBsRecycled := false
+	defer func() {
+		if !pooledBsRecycled {
+			pool.Put(firstPacketBs)
+		}
+	}()
+	n, err := srcRWC.Read(firstPacketBs[headerSize:])
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	//
-	buf := bytes.NewBuffer(pooledBs[:0:headerLen])
-	buf.Write(handler.passwordWithCRLF[:])
+	buf := bytes.NewBuffer(firstPacketBs[:0])
+	buf.Write(h.passwordWithCRLF[:])
 	buf.Write(CRLF)
 	writeSocksLikeConnectionCommandRequest(buf, accessAddr)
 
-	hostWithPort := handler.proxyNode.Host + ":" + strconv.Itoa(handler.proxyNode.TLSPort)
+	hostWithPort := h.proxyNode.Host + ":" + strconv.Itoa(h.proxyNode.TLSPort)
 	targetConn, err := netutil.DialTCP(hostWithPort)
 	if err != nil {
 		return errors.Wrapf(err, "fail to connect to the TLS server %v", hostWithPort)
@@ -133,10 +143,11 @@ func (handler *ClientHandler) ForwardConnection(srcRWC io.ReadWriteCloser, acces
 	defer func(conn net.Conn) {
 		_ = conn.Close()
 	}(targetConn)
-	tlsConn := tls.Client(targetConn, handler.tlsConfig)
+	tlsConn := tls.Client(targetConn, h.tlsConfig)
 
-	_, err = tlsConn.Write(pooledBs[0 : headerLen+n])
-	pool.Put(pooledBs)
+	_, err = tlsConn.Write(firstPacketBs[0 : headerSize+n])
+	pool.Put(firstPacketBs)
+	pooledBsRecycled = true
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -144,8 +155,6 @@ func (handler *ClientHandler) ForwardConnection(srcRWC io.ReadWriteCloser, acces
 }
 
 /*
-https://trojan-gfw.github.io/trojan/protocol
-
 SOCKS5-like request
 +-----+------+----------+----------+
 | CMD | ATYP | DST.ADDR | DST.PORT |
@@ -154,58 +163,11 @@ SOCKS5-like request
 +-----+------+----------+----------+
 */
 
-func socksLikeRequestSize(addr *transport.SocketAddress) int {
-	return 1 + 1 + toLen(addr)
+func socksLikeRequestSizeInBytes(addr *transport.SocketAddress) int {
+	return 1 + socks.SocksLikeAddrSizeInBytes(addr)
 }
 
 func writeSocksLikeConnectionCommandRequest(buf *bytes.Buffer, addr *transport.SocketAddress) {
 	buf.WriteByte(socks.ConnectionCommandConnect)
-	writeType(buf, addr)
-	writeAddrAndPort(buf, addr)
-}
-
-func writeType(buf *bytes.Buffer, addr *transport.SocketAddress) {
-	switch addr.AddrType {
-	case transport.IPv4:
-		buf.WriteByte(socks.ConnectionAddressIpv4)
-	case transport.IPv6:
-		buf.WriteByte(socks.ConnectionAddressIpv6)
-	default:
-		buf.WriteByte(socks.ConnectionAddressDomain)
-	}
-}
-
-func writeAddrAndPort(buf *bytes.Buffer, addr *transport.SocketAddress) {
-	switch addr.AddrType {
-	case transport.IPv4, transport.IPv6:
-		buf.Write(addr.IP.AsSlice())
-	default:
-		buf.WriteByte(byte(len(addr.Domain)))
-		buf.Write([]byte(addr.Domain))
-	}
-
-	bs := make([]byte, 2)
-	binary.BigEndian.PutUint16(bs, addr.Port)
-	buf.Write(bs)
-}
-
-/*
-https://en.wikipedia.org/wiki/SOCKS#SOCKS5
-
-Addr+Port(2)
-the address data that follows. Depending on type:
-4 bytes for IPv4 address
-1 byte of name length followed by 1–255 bytes for the domain name
-16 bytes for IPv6 address
-*/
-
-func toLen(addr *transport.SocketAddress) int {
-	switch addr.AddrType {
-	case transport.IPv4:
-		return 4 + 2
-	case transport.IPv6:
-		return 16 + 2
-	default:
-		return 1 + len(addr.Domain) + 2
-	}
+	socks.WriteSocksLikeAddr(buf, addr)
 }

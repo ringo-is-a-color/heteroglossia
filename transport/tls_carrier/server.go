@@ -93,28 +93,28 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 	textProtoReader := newTextprotoReader(bufReader)
 
 	// read one line in order to make our server like a normal HTTP server
-	bs, err := textProtoReader.ReadLineBytes()
+	lineBs, err := textProtoReader.ReadLineBytes()
 	putTextprotoReader(textProtoReader)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	isTrojan := false
-	if len(bs) != 16 || [16]byte(bs[0:16]) != serverInfo.passwordWithCRLF {
-		if len(bs) != 56 || [56]byte(bs[0:56]) != serverInfo.trojanPassword {
-			bufLen := bufReader.Buffered()
-			unreadBs, err := bufReader.Peek(bufLen)
+	if len(lineBs) != 16 || [16]byte(lineBs[0:16]) != serverInfo.passwordWithCRLF {
+		if len(lineBs) != 56 || [56]byte(lineBs[0:56]) != serverInfo.trojanPassword {
+			unreadBufSize := bufReader.Buffered()
+			unreadBs, err := bufReader.Peek(unreadBufSize)
 			if err != nil {
 				log.Fatal("fail to peek buff", err)
 			}
-			// len(CRLF) = 2
-			pooledBs := pool.Get(len(bs) + 2 + len(unreadBs))[:0]
-			defer pool.Put(pooledBs)
-			pooledBs = append(bs, CRLF...)
-			pooledBs = append(pooledBs, unreadBs...)
+			// 2 = len(CRLF)
+			unrelatedBs := pool.Get(len(lineBs) + 2 + len(unreadBs))[:0]
+			defer pool.Put(unrelatedBs)
+			unrelatedBs = append(unrelatedBs, CRLF...)
+			unrelatedBs = append(unrelatedBs, unreadBs...)
 			ip := netip.IPv6Loopback()
 			addr := transport.NewSocketAddressByIP(&ip, serverInfo.tlsBadAuthFallbackServerPort)
-			return handler.ForwardConnection(&ioutil.BytesReadPreloadReadWriteCloser{Preload: pooledBs, RWC: conn}, addr)
+			return handler.ForwardConnection(ioutil.NewBytesReadPreloadReadWriteCloser(unrelatedBs, conn), addr)
 		} else {
 			isTrojan = true
 		}
@@ -122,7 +122,7 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 
 	commandType, err := ioutil.Read1(bufReader)
 	if commandType != socks.ConnectionCommandConnect {
-		return errors.Newf("unsupported command type %v", bs[1])
+		return errors.Newf("unsupported command type %v", lineBs[1])
 	}
 	dest, err := socks.ReadSOCKS5Address(bufReader)
 	if err != nil {
@@ -136,12 +136,12 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 		}
 	}
 
-	bufLen := bufReader.Buffered()
-	unreadBs, err := bufReader.Peek(bufLen)
+	bufSize := bufReader.Buffered()
+	unreadBs, err := bufReader.Peek(bufSize)
 	if err != nil {
 		log.Fatal("fail to peek buff", err)
 	}
-	return handler.ForwardConnection(&ioutil.BytesReadPreloadReadWriteCloser{Preload: unreadBs, RWC: conn}, dest)
+	return handler.ForwardConnection(ioutil.NewBytesReadPreloadReadWriteCloser(unreadBs, conn), dest)
 }
 
 var textprotoReaderPool sync.Pool

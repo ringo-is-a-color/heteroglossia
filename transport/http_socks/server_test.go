@@ -112,7 +112,7 @@ func startProxyServer(t *testing.T, authInfo *transport.HTTPSOCKSAuthInfo) error
 	if err != nil {
 		return err
 	}
-	return handleRequest(rwc, authInfo, &direct.TCPReplayHandler{})
+	return handleRequest(rwc, authInfo, &direct.Handler{})
 }
 
 func startClient(authInfo *transport.HTTPSOCKSAuthInfo) error {

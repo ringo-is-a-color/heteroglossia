@@ -31,7 +31,7 @@ const (
 
 // https://www.rfc-editor.org/rfc/rfc1928
 
-/**
+/*
 Client Hello
 
 Request
@@ -49,9 +49,11 @@ Response
 +----+--------+
 */
 
-var helloNoAuthBytes = []byte{Sock5Version, helloNoAuthRequired}
-var helloUsernamePasswordBytes = []byte{Sock5Version, helloUsernamePassword}
-var helloNoAcceptableMethodsBytes = []byte{Sock5Version, helloNoAcceptableMethods}
+var (
+	helloNoAuthBytes              = []byte{Sock5Version, helloNoAuthRequired}
+	helloUsernamePasswordBytes    = []byte{Sock5Version, helloUsernamePassword}
+	helloNoAcceptableMethodsBytes = []byte{Sock5Version, helloNoAcceptableMethods}
+)
 
 func HandleSOCKS5RequestWithFirstByte(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler transport.ConnectionContinuationHandler) error {
 	return handleClientHelloRequest(conn, authInfo, handler)
@@ -157,7 +159,7 @@ Response
 */
 
 var connectionCommandNotSupportedBytes = []byte{Sock5Version, connectionCommandNotSupported, connectionReserved,
-	ConnectionAddressIpv4, 0, 0, 0, 0, 0}
+	connectionAddressIpv4, 0, 0, 0, 0, 0}
 
 // According to the rfc1928, we need to return the source address/port that SOCKS5 server used to connect to the target host,
 // but we just return dummy values here as these values are not useful to client and some SOCKS5 server return the dummy values.
@@ -166,7 +168,7 @@ var connectionSucceededPrefix = []byte{Sock5Version, connectionSucceeded, connec
 	1, 0, 0, 0, 0, 0, 0}
 
 func handleClientConnectionRequest(conn net.Conn, handler transport.ConnectionContinuationHandler) error {
-	bs, err := ioutil.ReadN(conn, 3)
+	_, bs, err := ioutil.ReadN(conn, 3)
 	if err != nil {
 		return err
 	}

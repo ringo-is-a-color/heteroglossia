@@ -8,20 +8,13 @@
       "system-proxy": false
     }
   },
-  "misc": {
-    "hg-binary-auto-update": false,
-    "profiling": true,
-    "profiling-port": 6061,
-    "rules-file-auto-update": false,
-    "tls-key-log": true,
-    "verbose-log": true
-  },
   "outbounds": {
     "node1": {
       "host": "localhost",
       "password": "66cac28e26cd4d6faf944821c702fadb",
       "tls-cert": "misc/tls_test_cert.pem",
-      "tls-port": 1082
+      "tls-port": 1082,
+      "tcp-port": 1083
     },
     "node2": {
       "host": "example.org",
@@ -54,5 +47,13 @@
         "policy": "node1"
       }
     ]
+  },
+  "misc": {
+    "hg-binary-auto-update": false,
+    "rules-file-auto-update": false,
+    "tls-key-log": true,
+    "verbose-log": true,
+    "profiling": true,
+    "profiling-port": 6061
   }
 }

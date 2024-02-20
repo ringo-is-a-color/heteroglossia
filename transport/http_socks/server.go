@@ -70,7 +70,7 @@ func handleRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler
 		// assume this is an HTTP proxy request
 		log.Debug("request", "source", conn.RemoteAddr().String(), "type", "HTTP Proxy")
 		// 256 is a micro optimisation here to reduce the buffer size
-		bufReader := bufio.NewReaderSize(&ioutil.BytesReadPreloadReadWriteCloser{Preload: []byte{b}, RWC: conn}, 256)
+		bufReader := bufio.NewReaderSize(ioutil.NewBytesReadPreloadReadWriteCloser([]byte{b}, conn), 256)
 		return http.HandleRequest(conn, bufReader, authInfo, handler)
 	}
 }

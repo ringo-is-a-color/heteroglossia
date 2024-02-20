@@ -24,7 +24,7 @@ type Handler struct {
 	HTTPClient        *http.Client
 }
 
-var _ transport.ConnectionContinuationHandler = &Handler{}
+var _ transport.ConnectionContinuationHandler = new(Handler)
 
 func NewHandler(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[string]*conf.ProxyNode, tlsKeyLog bool) *Handler {
 	router := &Handler{route, new(sync.RWMutex), outbounds, tlsKeyLog, nil}
@@ -80,7 +80,7 @@ func (h *Handler) ForwardHandler(accessAddr *transport.SocketAddress) (transport
 	var handler transport.ConnectionContinuationHandler
 	switch policy {
 	case "direct":
-		handler = new(direct.TCPReplayHandler)
+		handler = new(direct.Handler)
 	case "reject":
 		handler = new(reject.Handler)
 	default:

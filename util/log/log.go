@@ -3,7 +3,6 @@ package log
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"sync/atomic"
 
 	"github.com/mdobak/go-xerrors"
@@ -42,8 +41,5 @@ func Fatal(msg string, err error, args ...any) {
 
 func SetVerbose(b bool) {
 	verbose.Store(b)
-	handlerOptions := &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, handlerOptions)))
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 }

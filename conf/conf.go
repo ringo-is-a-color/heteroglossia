@@ -45,6 +45,7 @@ type ProxyNode struct {
 	Password    Password `json:"password" validate:"required"`
 	TLSPort     int      `json:"tls-port" validate:"gte=0,lte=65536"`
 	TLSCertFile string   `json:"tls-cert"`
+	TCPPort     int      `json:"tcp-port" validate:"gte=0,lte=65536"`
 }
 
 type Route struct {

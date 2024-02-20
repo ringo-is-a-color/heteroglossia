@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	ConnectionAddressIpv4   byte = 1
-	ConnectionAddressIpv6   byte = 4
-	ConnectionAddressDomain byte = 3
+	connectionAddressIpv4   byte = 1
+	connectionAddressIpv6   byte = 4
+	connectionAddressDomain byte = 3
 )
 
 func ReadSOCKS5Address(r io.Reader) (dest *transport.SocketAddress, err error) {
@@ -25,21 +25,21 @@ func ReadSOCKS5Address(r io.Reader) (dest *transport.SocketAddress, err error) {
 	var ip *netip.Addr
 	var domain string
 	switch addressType {
-	case ConnectionAddressIpv4:
-		ipv4, err := ioutil.ReadN(r, 4)
+	case connectionAddressIpv4:
+		_, ipv4, err := ioutil.ReadN(r, 4)
 		if err != nil {
 			return nil, err
 		}
 		addr := netip.AddrFrom4([4]byte(ipv4))
 		ip = &addr
-	case ConnectionAddressIpv6:
-		ipv6, err := ioutil.ReadN(r, 16)
+	case connectionAddressIpv6:
+		_, ipv6, err := ioutil.ReadN(r, 16)
 		if err != nil {
 			return nil, err
 		}
 		addr := netip.AddrFrom16([16]byte(ipv6))
 		ip = &addr
-	case ConnectionAddressDomain:
+	case connectionAddressDomain:
 		domain, err = ioutil.ReadStringByUint8(r)
 		if err != nil {
 			return nil, err
@@ -48,7 +48,7 @@ func ReadSOCKS5Address(r io.Reader) (dest *transport.SocketAddress, err error) {
 		err = errors.Newf("unknown address type %v", addressType)
 		return
 	}
-	portBs, err := ioutil.ReadN(r, 2)
+	_, portBs, err := ioutil.ReadN(r, 2)
 	if err != nil {
 		return
 	}
