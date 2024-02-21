@@ -113,29 +113,22 @@ func (h *Handler) updateRoute() {
 }
 
 func getHTTPClientThroughRouter(h *Handler) *http.Client {
-	defaultTransport := http.DefaultTransport.(*http.Transport)
-	// copy the same transport configuration from the 'http.DefaultTransport'
-	httpTransport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			socketAddr, err := transport.ToSocketAddrFromNetworkAddr(network, addr)
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.Proxy = nil
+	tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		socketAddr, err := transport.ToSocketAddrFromNetworkAddr(network, addr)
+		if err != nil {
+			return nil, err
+		}
+		lp, rp := net.Pipe()
+		go func() {
+			err = h.ForwardConnection(rp, socketAddr)
+			_ = rp.Close()
 			if err != nil {
-				return nil, err
+				log.InfoWithError("fail to forward connection for piping", err)
 			}
-			lp, rp := net.Pipe()
-			go func() {
-				err = h.ForwardConnection(rp, socketAddr)
-				_ = rp.Close()
-				if err != nil {
-					log.InfoWithError("fail to forward connection for piping", err)
-				}
-			}()
-			return lp, nil
-		},
-		ForceAttemptHTTP2:     defaultTransport.ForceAttemptHTTP2,
-		MaxIdleConns:          defaultTransport.MaxIdleConns,
-		IdleConnTimeout:       defaultTransport.IdleConnTimeout,
-		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
-		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+		}()
+		return lp, nil
 	}
-	return &http.Client{Transport: httpTransport}
+	return &http.Client{Transport: tr}
 }
