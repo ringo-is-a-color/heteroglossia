@@ -9,6 +9,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
+	"github.com/ringo-is-a-color/heteroglossia/util/log"
 )
 
 // see https://www.mnot.net/blog/2011/07/11/what_proxies_must_do point 1
@@ -61,7 +62,7 @@ func HandleRequest(conn net.Conn, connBufReader *bufio.Reader, authInfo *transpo
 		return handler.ForwardConnection(conn, addr)
 	}
 
-	lp, rp := ioutil.NewDuplexPipe()
+	lp, rp := net.Pipe()
 	go func() {
 		lprb := bufio.NewReader(lp)
 		var rerr, werr error
@@ -100,8 +101,13 @@ func HandleRequest(conn net.Conn, connBufReader *bufio.Reader, authInfo *transpo
 			}
 		}
 
-		lp.CloseReadWithError(rerr)
-		lp.CloseWriteWithError(werr)
+		_ = lp.Close()
+		if rerr != nil {
+			log.InfoWithError("fail to read request", rerr)
+		}
+		if werr != nil {
+			log.InfoWithError("fail to write resp", rerr)
+		}
 	}()
 
 	return handler.ForwardConnection(rp, addr)

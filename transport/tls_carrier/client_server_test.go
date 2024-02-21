@@ -2,6 +2,7 @@ package tls_carrier
 
 import (
 	"bufio"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -34,7 +35,17 @@ func TestClientServerConnection(t *testing.T) {
 	assert.Nil(t, err)
 	port, err := strconv.ParseUint(parse.Port(), 10, 16)
 	assert.Nil(t, err)
-	conn, err := tlsClient.CreateConnection(transport.NewSocketAddressByDomain(parse.Hostname(), uint16(port)))
+	conn, rp := net.Pipe()
+	defer func(conn net.Conn) {
+		_ = conn.Close()
+	}(conn)
+	go func() {
+		err := tlsClient.ForwardConnection(rp, transport.NewSocketAddressByDomain(parse.Hostname(), uint16(port)))
+		_ = rp.Close()
+		if err != nil {
+			assert.Nil(t, err)
+		}
+	}()
 	assert.Nil(t, err)
 
 	req, err := http.NewRequest("GET", server.URL, nil)

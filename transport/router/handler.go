@@ -37,23 +37,15 @@ func NewHandler(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[strin
 	return router
 }
 
-func (h *Handler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
-	forwardHandler, err := h.ForwardHandler(accessAddr)
-	if err != nil {
-		return nil, err
-	}
-	return forwardHandler.CreateConnection(accessAddr)
-}
-
 func (h *Handler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
-	forwardHandler, err := h.ForwardHandler(accessAddr)
+	forwardHandler, err := h.forwardHandler(accessAddr)
 	if err != nil {
 		return err
 	}
 	return forwardHandler.ForwardConnection(srcRWC, accessAddr)
 }
 
-func (h *Handler) ForwardHandler(accessAddr *transport.SocketAddress) (transport.ConnectionContinuationHandler, error) {
+func (h *Handler) forwardHandler(accessAddr *transport.SocketAddress) (transport.ConnectionContinuationHandler, error) {
 	h.routeRulesRWMutex.RLock()
 	var policy string
 	switch accessAddr.AddrType {
@@ -129,7 +121,15 @@ func getHTTPClientThroughRouter(h *Handler) *http.Client {
 			if err != nil {
 				return nil, err
 			}
-			return h.CreateConnection(socketAddr)
+			lp, rp := net.Pipe()
+			go func() {
+				err = h.ForwardConnection(rp, socketAddr)
+				_ = rp.Close()
+				if err != nil {
+					log.InfoWithError("fail to forward connection for piping", err)
+				}
+			}()
+			return lp, nil
 		},
 		ForceAttemptHTTP2:     defaultTransport.ForceAttemptHTTP2,
 		MaxIdleConns:          defaultTransport.MaxIdleConns,

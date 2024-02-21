@@ -33,17 +33,12 @@ func NewSSCarrierClient(proxyNode *conf.ProxyNode) *Handler {
 	return &Handler{proxyNode, proxyNode.Password.Raw[:], randutil.WeightedIntN(2)}
 }
 
-func (_ *Handler) CreateConnection(accessAddr *transport.SocketAddress) (net.Conn, error) {
-	// TODO
-	return nil, nil
-}
-
 func (h *Handler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
-	f, err := h.forwardConnection(srcRWC, accessAddr)
+	targetConn, err := h.forwardConnection(srcRWC, accessAddr)
 	if err != nil {
 		return err
 	}
-	return f()
+	return ioutil.Pipe(srcRWC, targetConn)
 }
 
 /*
@@ -76,8 +71,7 @@ const (
 	serverStreamHeaderType = 1
 )
 
-// Return a func here to make the 'defer' work because we need to use 'ioutil.Pipe' at the end, which requires time.
-func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) (func() error, error) {
+func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) (net.Conn, error) {
 	saltSize := len(h.preSharedKey)
 	clientSalt, err := randutil.RandNBytes(saltSize)
 	if err != nil {
@@ -167,14 +161,17 @@ func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *trans
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail to connect to the TCP server %v", hostWithPort)
 	}
-	defer func(conn net.Conn) {
-		_ = conn.Close()
-	}(targetConn)
 	_, err = targetConn.Write(reqHeaderEncryptedBs)
 	if err != nil {
+		_ = targetConn.Close()
 		return nil, errors.WithStack(err)
 	}
-	return h.handleResponse(srcRWC, targetConn, aeadRWC, clientSalt, reqAEAD.Overhead())
+	err = h.handleResponse(srcRWC, targetConn, aeadRWC, clientSalt, reqAEAD.Overhead())
+	if err != nil {
+		_ = targetConn.Close()
+		return nil, err
+	}
+	return targetConn, nil
 }
 
 /*
@@ -186,7 +183,7 @@ Response stream:
 +--------+------------------------+---------------------------+------------------------+---------------------------+---+
 */
 func (h *Handler) handleResponse(srcRWC io.ReadWriteCloser, targetConn *net.TCPConn,
-	aeadRWC *aeadReadWriteCloser, clientSalt []byte, aeadOverhead int) (func() error, error) {
+	aeadRWC *aeadReadWriteCloser, clientSalt []byte, aeadOverhead int) error {
 	saltSize := len(h.preSharedKey)
 	respFixedLenHeaderSize := 1 + 8 + saltSize + lenFieldSize + aeadOverhead
 	respSaltWithFixedLenHeaderSize := pool.Get(saltSize + respFixedLenHeaderSize)
@@ -204,13 +201,13 @@ func (h *Handler) handleResponse(srcRWC io.ReadWriteCloser, targetConn *net.TCPC
 	}()
 	_, err = ioutil.ReadOnceExpectFull(targetConn, respSaltWithFixedLenHeaderSize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	respSubkey := deriveSubkey(h.preSharedKey, respSaltWithFixedLenHeaderSize[:saltSize])
 	respAEAD, err := aeadCipher(respSubkey)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	aeadRWC.setAEADReader(respAEAD)
 	aeadRWC.rwc = targetConn
@@ -218,31 +215,28 @@ func (h *Handler) handleResponse(srcRWC io.ReadWriteCloser, targetConn *net.TCPC
 	respFixedLenHeaderBs := respSaltWithFixedLenHeaderSize[saltSize:]
 	err = aeadRWC.Decrypt(respFixedLenHeaderBs[:0], respFixedLenHeaderBs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	respPayloadSize, err := validateResponseHeaderAndReturnLen(respFixedLenHeaderBs, clientSalt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	respPayloadEncryptedBs := pool.Get(respPayloadSize + respAEAD.Overhead())
 	pool.Put(respPayloadEncryptedBs)
 	_, err = ioutil.ReadFull(targetConn, respPayloadEncryptedBs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = aeadRWC.Decrypt(respPayloadEncryptedBs[:0], respPayloadEncryptedBs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	_, err = srcRWC.Write(respPayloadEncryptedBs[:respPayloadSize])
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	return func() error {
-		return ioutil.Pipe(srcRWC, aeadRWC)
-	}, nil
+	return nil
 }
 
 /*
