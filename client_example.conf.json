@@ -12,8 +12,8 @@
     "node1": {
       "host": "localhost",
       "password": "66cac28e26cd4d6faf944821c702fadb",
-      "tls-cert": "misc/tls_test_cert.pem",
       "tls-port": 1082,
+      "tls-cert": "misc/tls_test_cert.pem",
       "tcp-port": 1083
     },
     "node2": {

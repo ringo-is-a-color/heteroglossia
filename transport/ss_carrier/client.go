@@ -23,6 +23,7 @@ import (
 type Handler struct {
 	proxyNode    *conf.ProxyNode
 	preSharedKey []byte
+	aeadOverhead int
 	// a function to randomly pick Ex2 and 5 mentioned here https://gfw.report/publications/usenixsecurity23/en/
 	exPicker func() int
 }
@@ -30,7 +31,7 @@ type Handler struct {
 var _ transport.ConnectionContinuationHandler = new(Handler)
 
 func NewSSCarrierClient(proxyNode *conf.ProxyNode) *Handler {
-	return &Handler{proxyNode, proxyNode.Password.Raw[:], randutil.WeightedIntN(2)}
+	return &Handler{proxyNode, proxyNode.Password.Raw[:], gcmTagOverhead, randutil.WeightedIntN(2)}
 }
 
 func (h *Handler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
@@ -69,6 +70,8 @@ const (
 	lenFieldSize           = 2
 	clientStreamHeaderType = 0
 	serverStreamHeaderType = 1
+
+	reqFixedLenHeaderSize = 1 + 8 + lenFieldSize
 )
 
 func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) (net.Conn, error) {
@@ -125,7 +128,6 @@ func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *trans
 	// +------+------------------+--------+
 	// |  1B  | u64be unix epoch |  u16be |
 	// +------+------------------+--------+
-	reqFixedLenHeaderSize := 1 + 8 + lenFieldSize
 	reqFixedLenHeaderBuf := bytes.NewBuffer(make([]byte, 0, reqFixedLenHeaderSize))
 	reqFixedLenHeaderBuf.WriteByte(clientStreamHeaderType)
 	err = binary.Write(reqFixedLenHeaderBuf, binary.BigEndian, uint64(time.Now().Unix()))
@@ -144,9 +146,10 @@ func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *trans
 	}
 	aeadRWC := new(aeadReadWriteCloser)
 	aeadRWC.setAEADWriter(reqAEAD)
+	aeadRWC.aeadOverhead = h.aeadOverhead
 
-	reqVarLenHeaderStart := saltSize + reqFixedLenHeaderSize + reqAEAD.Overhead()
-	reqHeaderEncryptedBs := pool.Get(reqVarLenHeaderStart + reqVarLenHeaderSize + reqAEAD.Overhead())
+	reqVarLenHeaderEncryptedStart := saltSize + reqFixedLenHeaderSize + h.aeadOverhead
+	reqHeaderEncryptedBs := pool.Get(reqVarLenHeaderEncryptedStart + reqVarLenHeaderSize + h.aeadOverhead)
 	defer pool.Put(reqHeaderEncryptedBs)
 	reqHeaderBuf := bytes.NewBuffer(reqHeaderEncryptedBs[:0])
 	_, err = reqHeaderBuf.Write(clientSalt)
@@ -154,7 +157,7 @@ func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *trans
 		return nil, errors.WithStack(err)
 	}
 	aeadRWC.Encrypt(reqHeaderEncryptedBs[saltSize:saltSize], reqFixedLenHeaderBuf.Bytes())
-	aeadRWC.Encrypt(reqHeaderEncryptedBs[reqVarLenHeaderStart:reqVarLenHeaderStart], reqVarLenHeaderBuf.Bytes())
+	aeadRWC.Encrypt(reqHeaderEncryptedBs[reqVarLenHeaderEncryptedStart:reqVarLenHeaderEncryptedStart], reqVarLenHeaderBuf.Bytes())
 
 	hostWithPort := h.proxyNode.Host + ":" + strconv.Itoa(h.proxyNode.TCPPort)
 	targetConn, err := netutil.DialTCP(hostWithPort)
@@ -166,7 +169,7 @@ func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *trans
 		_ = targetConn.Close()
 		return nil, errors.WithStack(err)
 	}
-	err = h.handleResponse(srcRWC, targetConn, aeadRWC, clientSalt, reqAEAD.Overhead())
+	err = h.handleResponse(srcRWC, targetConn, aeadRWC, clientSalt)
 	if err != nil {
 		_ = targetConn.Close()
 		return nil, err
@@ -183,11 +186,10 @@ Response stream:
 +--------+------------------------+---------------------------+------------------------+---------------------------+---+
 */
 func (h *Handler) handleResponse(srcRWC io.ReadWriteCloser, targetConn *net.TCPConn,
-	aeadRWC *aeadReadWriteCloser, clientSalt []byte, aeadOverhead int) error {
+	aeadRWC *aeadReadWriteCloser, clientSalt []byte) error {
 	saltSize := len(h.preSharedKey)
-	respFixedLenHeaderSize := 1 + 8 + saltSize + lenFieldSize + aeadOverhead
-	respSaltWithFixedLenHeaderSize := pool.Get(saltSize + respFixedLenHeaderSize)
-	defer pool.Put(respSaltWithFixedLenHeaderSize)
+	respSaltWithFixedLenHeaderEncryptedSize := pool.Get(saltSize + reqFixedLenHeaderSize + saltSize + h.aeadOverhead)
+	defer pool.Put(respSaltWithFixedLenHeaderEncryptedSize)
 	var err error
 	defer func() {
 		if err != nil {
@@ -199,12 +201,12 @@ func (h *Handler) handleResponse(srcRWC io.ReadWriteCloser, targetConn *net.TCPC
 			}
 		}
 	}()
-	_, err = ioutil.ReadOnceExpectFull(targetConn, respSaltWithFixedLenHeaderSize)
+	_, err = ioutil.ReadOnceExpectFull(targetConn, respSaltWithFixedLenHeaderEncryptedSize)
 	if err != nil {
 		return err
 	}
 
-	respSubkey := deriveSubkey(h.preSharedKey, respSaltWithFixedLenHeaderSize[:saltSize])
+	respSubkey := deriveSubkey(h.preSharedKey, respSaltWithFixedLenHeaderEncryptedSize[:saltSize])
 	respAEAD, err := aeadCipher(respSubkey)
 	if err != nil {
 		return err
@@ -212,17 +214,17 @@ func (h *Handler) handleResponse(srcRWC io.ReadWriteCloser, targetConn *net.TCPC
 	aeadRWC.setAEADReader(respAEAD)
 	aeadRWC.rwc = targetConn
 
-	respFixedLenHeaderBs := respSaltWithFixedLenHeaderSize[saltSize:]
-	err = aeadRWC.Decrypt(respFixedLenHeaderBs[:0], respFixedLenHeaderBs)
+	respFixedLenHeaderEncryptedBs := respSaltWithFixedLenHeaderEncryptedSize[saltSize:]
+	err = aeadRWC.Decrypt(respFixedLenHeaderEncryptedBs[:0], respFixedLenHeaderEncryptedBs)
 	if err != nil {
 		return err
 	}
-	respPayloadSize, err := validateResponseHeaderAndReturnLen(respFixedLenHeaderBs, clientSalt)
+	respPayloadSize, err := validateResponseHeaderAndReturnLen(respFixedLenHeaderEncryptedBs, clientSalt)
 	if err != nil {
 		return err
 	}
 
-	respPayloadEncryptedBs := pool.Get(respPayloadSize + respAEAD.Overhead())
+	respPayloadEncryptedBs := pool.Get(respPayloadSize + h.aeadOverhead)
 	pool.Put(respPayloadEncryptedBs)
 	_, err = ioutil.ReadFull(targetConn, respPayloadEncryptedBs)
 	if err != nil {

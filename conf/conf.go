@@ -38,6 +38,7 @@ type Hg struct {
 	TLSPort                   int             `json:"tls-port" validate:"gte=0,lte=65536"`
 	TLSCertKeyPair            *TLSCertKeyPair `json:"tls-cert-key-pair"`
 	TLSBadAuthFallbackSiteDir string          `json:"tls-bad-auth-fallback-site-dir"`
+	TCPPort                   int             `json:"tcp-port" validate:"gte=0,lte=65536"`
 }
 
 type ProxyNode struct {

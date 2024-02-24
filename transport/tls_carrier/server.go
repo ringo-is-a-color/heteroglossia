@@ -70,10 +70,7 @@ func ListenRequests(hg *conf.Hg, handler transport.ConnectionContinuationHandler
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	return listenRequests(serverInfo, handler)
-}
 
-func listenRequests(serverInfo *serverInfo, handler transport.ConnectionContinuationHandler) error {
 	addr := ":" + strconv.Itoa(serverInfo.hg.TLSPort)
 	return netutil.ListenTLSAndAccept(addr, serverInfo.tlsConfig, func(conn net.Conn) {
 		err := handleRequest(conn, serverInfo, handler)

@@ -11,12 +11,13 @@ import (
 )
 
 type aeadReadWriteCloser struct {
-	rwc         io.ReadWriteCloser
-	aeadReader  cipher.AEAD
-	nonceReader []byte
-	readerBuf   []byte
-	aeadWriter  cipher.AEAD
-	nonceWriter []byte
+	rwc          io.ReadWriteCloser
+	aeadReader   cipher.AEAD
+	nonceReader  []byte
+	readerBuf    []byte
+	aeadWriter   cipher.AEAD
+	nonceWriter  []byte
+	aeadOverhead int
 }
 
 var _ io.ReadWriteCloser = new(aeadReadWriteCloser)
@@ -52,7 +53,7 @@ func (rwc *aeadReadWriteCloser) Read(p []byte) (n int, err error) {
 		}
 	}
 
-	payloadLenEncryptedSize := lenFieldSize + rwc.aeadReader.Overhead()
+	payloadLenEncryptedSize := lenFieldSize + rwc.aeadOverhead
 	_, payloadLenEncryptedBs, err := ioutil.ReadN(rwc.rwc, payloadLenEncryptedSize)
 	if err != nil {
 		return 0, err
@@ -63,7 +64,7 @@ func (rwc *aeadReadWriteCloser) Read(p []byte) (n int, err error) {
 	}
 	payloadSize := int(binary.BigEndian.Uint16(payloadLenEncryptedBs))
 
-	payloadEncryptedBs := pool.Get(payloadSize + rwc.aeadReader.Overhead())
+	payloadEncryptedBs := pool.Get(payloadSize + rwc.aeadOverhead)
 	defer pool.Put(payloadEncryptedBs)
 	_, err = ioutil.ReadFull(rwc.rwc, payloadEncryptedBs)
 	if err != nil {
@@ -111,12 +112,12 @@ func (rwc *aeadReadWriteCloser) Write(p []byte) (n int, err error) {
 			canWriteCount = 0
 		}
 
-		payloadEncryptedSize := lenFieldSize + rwc.aeadWriter.Overhead() + len(payloadChunk) + rwc.aeadWriter.Overhead()
+		payloadEncryptedSize := lenFieldSize + rwc.aeadOverhead + len(payloadChunk) + rwc.aeadOverhead
 		payloadEncryptedBs := pool.Get(payloadEncryptedSize)
 		binary.BigEndian.PutUint16(payloadEncryptedBs, uint16(len(payloadChunk)))
 		rwc.Encrypt(payloadEncryptedBs[:0], payloadEncryptedBs[:lenFieldSize])
 
-		payloadStart := lenFieldSize + rwc.aeadWriter.Overhead()
+		payloadStart := lenFieldSize + rwc.aeadOverhead
 		rwc.Encrypt(payloadEncryptedBs[payloadStart:payloadStart], payloadChunk)
 
 		count, err := rwc.rwc.Write(payloadEncryptedBs)
@@ -130,8 +131,8 @@ func (rwc *aeadReadWriteCloser) Write(p []byte) (n int, err error) {
 }
 
 func (rwc *aeadReadWriteCloser) ReadFrom(r io.Reader) (n int64, err error) {
-	payloadStart := lenFieldSize + rwc.aeadWriter.Overhead()
-	payloadEncryptedSize := payloadStart + maxChunkSize + rwc.aeadWriter.Overhead()
+	payloadStart := lenFieldSize + rwc.aeadOverhead
+	payloadEncryptedSize := payloadStart + maxChunkSize + rwc.aeadOverhead
 	payloadEncryptedBs := pool.Get(payloadEncryptedSize)
 	defer pool.Put(payloadEncryptedBs)
 	for {
@@ -145,7 +146,7 @@ func (rwc *aeadReadWriteCloser) ReadFrom(r io.Reader) (n int64, err error) {
 		rwc.Encrypt(payloadEncryptedBs[payloadStart:payloadStart],
 			payloadEncryptedBs[payloadStart:payloadStart+count])
 
-		_, err = rwc.rwc.Write(payloadEncryptedBs[:payloadStart+count+rwc.aeadWriter.Overhead()])
+		_, err = rwc.rwc.Write(payloadEncryptedBs[:payloadStart+count+rwc.aeadOverhead])
 		if err != nil {
 			return n, errors.WithStack(err)
 		}
@@ -161,7 +162,7 @@ func (rwc *aeadReadWriteCloser) WriteTo(w io.Writer) (n int64, err error) {
 		}
 	}
 
-	payloadLenEncryptedBs := make([]byte, lenFieldSize+rwc.aeadReader.Overhead())
+	payloadLenEncryptedBs := make([]byte, lenFieldSize+rwc.aeadOverhead)
 	for {
 		_, err := ioutil.ReadFull(rwc.rwc, payloadLenEncryptedBs)
 		if err != nil {
@@ -173,7 +174,7 @@ func (rwc *aeadReadWriteCloser) WriteTo(w io.Writer) (n int64, err error) {
 		}
 		payloadSize := int(binary.BigEndian.Uint16(payloadLenEncryptedBs))
 
-		payloadEncryptedBs := pool.Get(payloadSize + rwc.aeadReader.Overhead())
+		payloadEncryptedBs := pool.Get(payloadSize + rwc.aeadOverhead)
 		_, err = ioutil.ReadFull(rwc.rwc, payloadEncryptedBs)
 		if err != nil {
 			pool.Put(payloadEncryptedBs)

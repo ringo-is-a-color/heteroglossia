@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	_ "unsafe"
 )
 
 func listenEndSignalAndRunHandler() {
@@ -27,3 +28,6 @@ func listenEndSignalAndRunHandler() {
 		panic(err)
 	}
 }
+
+//go:linkname runHandlers github.com/tebeka/atexit.runHandlers
+func runHandlers()

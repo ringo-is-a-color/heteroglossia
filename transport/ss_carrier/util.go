@@ -19,6 +19,8 @@ func deriveSubkey(psk, salt []byte) []byte {
 	return key
 }
 
+const gcmTagOverhead = 16
+
 func aeadCipher(subkey []byte) (cipher.AEAD, error) {
 	block, err := aes.NewCipher(subkey)
 	if err != nil {
