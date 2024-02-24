@@ -27,7 +27,7 @@ func init() {
 func Parse(configFilePath string) (*Config, error) {
 	bs, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
-		return nil, errors.Wrap(err, "error")
+		return nil, errors.New(err, "error")
 	}
 
 	config := &Config{}
@@ -36,7 +36,7 @@ func Parse(configFilePath string) (*Config, error) {
 	config.Misc.ProfilingPort = defaultProfilingPort
 	err = json.Unmarshal(bs, &config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error: %v", configFilePath)
+		return nil, errors.Newf(err, "error: %v", configFilePath)
 	}
 
 	err = config.Route.Rules.SetupRulesData()

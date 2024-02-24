@@ -97,7 +97,7 @@ func (matcher *Matcher) SetupRulesData(rulesQueryStore *DomainIPSetRulesQuerySto
 
 	ipSet, err := ipSetBuilder.IPSet()
 	if err != nil {
-		return errors.Wrap(err, "fail to build the IP set")
+		return errors.New(err, "fail to build the IP set")
 	}
 	matcher.domainRegexMatcher = domainRegexMatcher
 	matcher.ipCidrMatcher = ipSet
@@ -126,7 +126,7 @@ func (matcher *Matcher) UnmarshalJSON(data []byte) error {
 	var matchRules []string
 	err := json.Unmarshal(data, &matchRules)
 	if err != nil {
-		return errors.Wrap(err, "fail to parse 'match' rules")
+		return errors.New(err, "fail to parse 'match' rules")
 	}
 
 	createdMatcher := NewMatcher(matchRules)

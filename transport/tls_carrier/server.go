@@ -40,7 +40,7 @@ func newServerInfo(hg *conf.Hg) (*serverInfo, error) {
 	} else {
 		cert, err := tls.LoadX509KeyPair(hg.TLSCertKeyPair.CertFile, hg.TLSCertKeyPair.KeyFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "fail to load TLS Certificate/Key pair files")
+			return nil, errors.New(err, "fail to load TLS Certificate/Key pair files")
 		}
 		serverInfo.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}

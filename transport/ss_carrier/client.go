@@ -162,7 +162,7 @@ func (h *Handler) forwardConnection(srcRWC io.ReadWriteCloser, accessAddr *trans
 	hostWithPort := h.proxyNode.Host + ":" + strconv.Itoa(h.proxyNode.TCPPort)
 	targetConn, err := netutil.DialTCP(hostWithPort)
 	if err != nil {
-		return nil, errors.Wrapf(err, "fail to connect to the TCP server %v", hostWithPort)
+		return nil, errors.Newf(err, "fail to connect to the TCP server %v", hostWithPort)
 	}
 	_, err = targetConn.Write(reqHeaderEncryptedBs)
 	if err != nil {

@@ -40,7 +40,7 @@ func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*Handler, e
 	} else {
 		certBs, err := ioutil.ReadFile(proxyNode.TLSCertFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "fail to load the TLS certificate file")
+			return nil, errors.New(err, "fail to load the TLS certificate file")
 		}
 		certPool := x509.NewCertPool()
 		block, _ := pem.Decode(certBs)
@@ -118,7 +118,7 @@ func (h *Handler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *trans
 	hostWithPort := h.proxyNode.Host + ":" + strconv.Itoa(h.proxyNode.TLSPort)
 	targetConn, err := netutil.DialTCP(hostWithPort)
 	if err != nil {
-		return errors.Wrapf(err, "fail to connect to the TLS server %v", hostWithPort)
+		return errors.Newf(err, "fail to connect to the TLS server %v", hostWithPort)
 	}
 	tlsConn := tls.Client(targetConn, h.tlsConfig)
 

@@ -7,24 +7,39 @@ import (
 	"github.com/mdobak/go-xerrors"
 )
 
-func New(msg string) error {
-	return xerrors.New(msg)
+// examples:
+// New("access denied")
+// New(ErrReadError, "access denied")
+
+func New(vals ...any) error {
+	return xerrors.New(vals)
 }
 
-func Newf(format string, a ...any) error {
-	return xerrors.New(fmt.Sprintf(format, a...))
+// examples:
+// Newf("access denied: %v", "404")
+// Newf(ErrReadError, "access denied: %v", "404"))
+
+func Newf(vals ...any) error {
+	n := len(vals)
+	if n > 0 {
+		switch v := vals[0].(type) {
+		case error:
+			if n > 1 {
+				format, ok := vals[1].(string)
+				if ok {
+					return xerrors.New(v, fmt.Sprintf(format, vals[2:]...))
+				}
+			}
+		case string:
+			return xerrors.New(fmt.Sprintf(v, vals[1:]...))
+		}
+	}
+
+	panic(fmt.Sprintf("unsupported argument list: %v", vals))
 }
 
 func WithStack(err error) error {
 	return xerrors.New(err)
-}
-
-func Wrap(err error, msg string) error {
-	return xerrors.New(err, msg)
-}
-
-func Wrapf(err error, format string, a ...any) error {
-	return xerrors.New(err, fmt.Sprintf(format, a...))
 }
 
 var Join = xerrors.Append

@@ -15,7 +15,7 @@ func Run(name string, arg ...string) (string, error) {
 	stdout := outBuilder.String()
 	stderr := errBuilder.String()
 	if err != nil {
-		return "", errors.Wrapf(err, "standard output '%v' and standard error '%v' when running the command '%v %v'",
+		return "", errors.Newf(err, "standard output '%v' and standard error '%v' when running the command '%v %v'",
 			stdout, stderr, name, strings.Join(arg, " "))
 	}
 	if errBuilder.Len() > 0 {
@@ -31,7 +31,7 @@ func RunWithStdoutErrResults(name string, arg ...string) (string, string, error)
 	cmd.Stderr = errorBuilder
 	err := cmd.Run()
 	if err != nil {
-		return "", "", errors.Wrapf(err, "error '%v' when running command '%v %v'", errorBuilder.String(),
+		return "", "", errors.Newf(err, "error '%v' when running command '%v %v'", errorBuilder.String(),
 			name, strings.Join(arg, " "))
 	}
 	return outputBuilder.String(), errorBuilder.String(), nil
@@ -44,7 +44,7 @@ func RunWithInput(name string, input string) (string, error) {
 	cmd.Stdin = strings.NewReader(input)
 	err := cmd.Run()
 	if err != nil {
-		return "", errors.Wrapf(err, "error '%v' when running command '%v' with '%v' input", errorBuilder.String(),
+		return "", errors.Newf(err, "error '%v' when running command '%v' with '%v' input", errorBuilder.String(),
 			name, input)
 	}
 	if errorBuilder.Len() > 0 {
