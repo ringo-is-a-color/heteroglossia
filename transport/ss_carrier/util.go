@@ -26,8 +26,7 @@ func aeadCipher(subkey []byte) (cipher.AEAD, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	aead, err := cipher.NewGCM(block)
-	return aead, errors.WithStack(err)
+	return errors.WithStack2(cipher.NewGCM(block))
 }
 
 const MaxUnixTimeDiffInSecond = 30

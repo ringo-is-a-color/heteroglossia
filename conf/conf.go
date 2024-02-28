@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/ringo-is-a-color/heteroglossia/conf/rule"
+	libRule "github.com/ringo-is-a-color/heteroglossia/conf/rule"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 )
 
@@ -57,8 +57,8 @@ type Route struct {
 type Rules []Rule
 
 type Rule struct {
-	Matcher *rule.Matcher `json:"match"`
-	Policy  string        `json:"policy" validate:"required"`
+	Matcher *libRule.Matcher `json:"match"`
+	Policy  string           `json:"policy" validate:"required"`
 }
 
 type Misc struct {
@@ -76,14 +76,14 @@ type TLSCertKeyPair struct {
 }
 
 func (rules Rules) SetupRulesData() error {
-	store, err := rule.NewDomainIPSetRulesQueryStore()
+	store, err := libRule.NewDomainIPSetRulesQueryStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	for _, rulee := range rules {
-		err := rulee.Matcher.SetupRulesData(store)
+	for _, rule := range rules {
+		err := rule.Matcher.SetupRulesData(store)
 		if err != nil {
 			return err
 		}

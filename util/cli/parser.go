@@ -31,6 +31,6 @@ func (Args) Version() string {
 	return AppName + "(hg) " + version
 }
 
-func GetVersionWithVPrefix() string {
+func VersionWithVPrefix() string {
 	return "v" + version
 }

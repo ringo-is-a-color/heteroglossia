@@ -21,11 +21,11 @@ const (
 )
 
 func UpdateHgBinary(client *http.Client) (bool, string, error) {
-	currentVersion := cli.GetVersionWithVPrefix()
+	currentVersion := cli.VersionWithVPrefix()
 	if !semver.IsValid(currentVersion) {
 		return false, "", errors.New("the current binary has an invalid semantic version, so skip the update")
 	}
-	latestTagVersion, err := getLatestTagVersion(client)
+	latestTagVersion, err := latestTagVersion(client)
 	if err != nil {
 		return false, "", err
 	}
@@ -40,7 +40,7 @@ func UpdateHgBinary(client *http.Client) (bool, string, error) {
 		if err != nil {
 			return false, "", errors.WithStack(err)
 		}
-		err = updateFile(client, executablePath, getHgBinaryURL(latestTagVersion), getHgBinaryURLSHA256SumURL(latestTagVersion))
+		err = updateFile(client, executablePath, hgBinaryURL(latestTagVersion), hgBinaryURLSHA256SumURL(latestTagVersion))
 		if err != nil {
 			return false, "", err
 		}
@@ -49,7 +49,7 @@ func UpdateHgBinary(client *http.Client) (bool, string, error) {
 	return false, "", err
 }
 
-func getLatestTagVersion(client *http.Client) (string, error) {
+func latestTagVersion(client *http.Client) (string, error) {
 	resp, err := client.Get(hgBinaryLatestVersionURL)
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -77,10 +77,10 @@ type Latest struct {
 	TagName string `json:"tag_name"`
 }
 
-func getHgBinaryURL(version string) string {
+func hgBinaryURL(version string) string {
 	return fmt.Sprintf(hgBinaryURLTemplate, version, version[1:], runtime.GOOS, runtime.GOARCH)
 }
 
-func getHgBinaryURLSHA256SumURL(version string) string {
+func hgBinaryURLSHA256SumURL(version string) string {
 	return hgBinaryURLSHA256SumURLTemplate + version
 }

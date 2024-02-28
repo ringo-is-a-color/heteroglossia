@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/mdobak/go-xerrors"
 )
@@ -42,6 +43,14 @@ func WithStack(err error) error {
 	return xerrors.New(err)
 }
 
+func WithStack2[T any](t T, err error) (T, error) {
+	return t, xerrors.New(err)
+}
+
 var Join = xerrors.Append
 
 var Is = errors.Is
+
+func IsIoEof(err error) bool {
+	return errors.Is(err, io.EOF)
+}

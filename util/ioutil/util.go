@@ -8,11 +8,6 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 )
 
-// https://superuser.com/a/1652039
-// Use a TCP MSS value because it may cover most common case
-
-const TCPBufSize = 1448
-
 // includes file's abs path when an error occurs
 
 func ReadFile(filePath string) ([]byte, error) {
@@ -20,8 +15,7 @@ func ReadFile(filePath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	bs, err := os.ReadFile(fullPath)
-	return bs, errors.WithStack(err)
+	return errors.WithStack2(os.ReadFile(fullPath))
 }
 
 func Read1(r io.Reader) (byte, error) {
@@ -36,26 +30,30 @@ func ReadN(r io.Reader, n int) (int, []byte, error) {
 	return count, bs, errors.WithStack(err)
 }
 
+// it's better to check 'io.Eof' case when using this function
+
 func ReadOnceExpectFull(r io.Reader, buf []byte) (int, error) {
 	count, err := r.Read(buf)
 	if err == nil && count < len(buf) {
 		return count, errors.Newf("expected %v byte(s) in one read call, but got %v", len(buf), count)
 	}
-	return count, errors.WithStack(err)
+	if !errors.IsIoEof(err) {
+		err = errors.WithStack(err)
+	}
+	return count, err
 }
 
 func ReadFull(r io.Reader, buf []byte) (int, error) {
-	n, err := io.ReadFull(r, buf)
-	return n, errors.WithStack(err)
+	return errors.WithStack2(io.ReadFull(r, buf))
 }
 
 func ReadByUint8(r io.Reader) ([]byte, error) {
-	n, err := Read1(r)
+	b, err := Read1(r)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	bs := make([]byte, n)
+	bs := make([]byte, b)
 	_, err = io.ReadFull(r, bs)
 	return bs, errors.WithStack(err)
 }
@@ -80,9 +78,9 @@ func Pipe(a, b io.ReadWriteCloser) error {
 
 	go cp(a, b)
 	go cp(b, a)
-	// only care about the first error as we close other directly when see first error
+	// only care about the first error as we close other directly when see the first error
 	err := <-done
-	if errors.Is(err, io.EOF) {
+	if errors.IsIoEof(err) {
 		return nil
 	}
 	return errors.WithStack(err)

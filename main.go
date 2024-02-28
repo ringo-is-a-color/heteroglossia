@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	_ "net/http/pprof"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport/router"
 	"github.com/ringo-is-a-color/heteroglossia/transport/tls_carrier"
 	"github.com/ringo-is-a-color/heteroglossia/util/cli"
+	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
@@ -35,19 +37,18 @@ func main() {
 	}
 
 	log.SetVerbose(config.Misc.VerboseLog)
-
 	if config.Misc.Profiling {
 		go func() {
-			err := netutil.ListenHTTPAndServe(":"+strconv.Itoa(config.Misc.ProfilingPort), nil)
+			err := netutil.ListenHTTPAndServe(context.Background(), ":"+strconv.Itoa(config.Misc.ProfilingPort), nil)
 			if err != nil {
 				log.Error("fail to start the profiling server", err)
 			}
 		}()
 	}
-	routeHandler := router.NewHandler(&config.Route, config.Misc.RulesFileAutoUpdate, config.Outbounds, config.Misc.TLSKeyLog)
+	routeClient := router.NewClient(&config.Route, config.Misc.RulesFileAutoUpdate, config.Outbounds, config.Misc.TLSKeyLog)
 	if config.Inbounds.Hg != nil {
 		go func() {
-			err := tls_carrier.ListenRequests(config.Inbounds.Hg, routeHandler)
+			err := tls_carrier.ListenRequests(context.Background(), config.Inbounds.Hg, routeClient)
 			if err != nil {
 				log.Fatal("fail to start the hg server", err)
 			}
@@ -55,7 +56,7 @@ func main() {
 	}
 	if config.Inbounds.HTTPSOCKS != nil {
 		go func() {
-			err := http_socks.ListenRequests(config.Inbounds.HTTPSOCKS, routeHandler)
+			err := http_socks.ListenRequests(context.Background(), config.Inbounds.HTTPSOCKS, routeClient)
 			if err != nil {
 				log.Fatal("fail to start the HTTP/SOCKS server", err)
 			}
@@ -64,7 +65,7 @@ func main() {
 
 	if config.Misc.HgBinaryAutoUpdate {
 		go updater.StartUpdateCron(func() {
-			success, latestVersion, err := updater.UpdateHgBinary(routeHandler.HTTPClient)
+			success, latestVersion, err := updater.UpdateHgBinary(routeClient.HTTPClient)
 			if err != nil {
 				log.WarnWithError("fail to update the hg binary", err)
 			}
@@ -96,9 +97,9 @@ func selfRestart() {
 		cmd.Stderr = os.Stderr
 		cmd.Env = os.Environ()
 		netutil.StopAllListeners()
-		err := cmd.Run()
+		err = cmd.Run()
 		if err != nil {
-			log.Fatal("fail to start the new hg binary", err)
+			log.Fatal("fail to start the new hg binary", errors.WithStack(err))
 		}
 		osutil.Exit(0)
 	}

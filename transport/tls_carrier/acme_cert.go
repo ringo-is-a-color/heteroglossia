@@ -1,6 +1,7 @@
 package tls_carrier
 
 import (
+	"context"
 	"crypto/tls"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-func getTLSConfigWithAutomatedCertificate(host string) (*tls.Config, error) {
+func tlsConfigWithAutomatedCertificate(ctx context.Context, host string) (*tls.Config, error) {
 	certManager := autocert.Manager{
 		Prompt:      autocert.AcceptTOS,
 		Cache:       autocert.DirCache("certs"),
@@ -18,7 +19,7 @@ func getTLSConfigWithAutomatedCertificate(host string) (*tls.Config, error) {
 	}
 
 	go func() {
-		err := netutil.ListenHTTPAndServe(":80", certManager.HTTPHandler(nil))
+		err := netutil.ListenHTTPAndServe(ctx, ":80", certManager.HTTPHandler(nil))
 		if err != nil {
 			log.Fatal("fail to start a HTTP server for automatic renewing certificate", err)
 		}

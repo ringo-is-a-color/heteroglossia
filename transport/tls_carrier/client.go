@@ -1,19 +1,17 @@
 package tls_carrier
 
 import (
-	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
+	"net"
 	"os"
 	"path"
 	"strconv"
 
-	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
-	"github.com/ringo-is-a-color/heteroglossia/transport/socks"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
@@ -21,18 +19,18 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
 )
 
-type Handler struct {
-	proxyNode        *conf.ProxyNode
-	tlsConfig        *tls.Config
-	passwordWithCRLF [16]byte
+type Client struct {
+	proxyNode           *conf.ProxyNode
+	tlsConfig           *tls.Config
+	passwordWithoutCRLF [16]byte
 }
 
-var _ transport.ConnectionContinuationHandler = new(Handler)
+var _ transport.Client = new(Client)
 
 const tlsKeyLogFilepath = "logs/tls_key.log"
 
-func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*Handler, error) {
-	clientHandler := &Handler{proxyNode: proxyNode}
+func NewClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*Client, error) {
+	clientHandler := &Client{proxyNode: proxyNode}
 	if proxyNode.TLSCertFile == "" {
 		clientHandler.tlsConfig = &tls.Config{
 			ServerName: proxyNode.Host,
@@ -80,72 +78,21 @@ func NewTLSCarrierClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*Handler, e
 		})
 	}
 
-	clientHandler.passwordWithCRLF = replaceCRLF(proxyNode.Password.Raw)
+	clientHandler.passwordWithoutCRLF = replaceCRLF(proxyNode.Password.Raw)
 	return clientHandler, nil
 }
 
-/*
-https://trojan-gfw.github.io/trojan/protocol
-
-+-----------------------+---------+----------------+---------+----------+
-| hex(SHA224(password)) |  CRLF   | Trojan Request |  CRLF   | Payload  |
-+-----------------------+---------+----------------+---------+----------+
-|          56           | X'0D0A' |    Variable    | X'0D0A' | Variable |
-+-----------------------+---------+----------------+---------+----------+
-*/
-
-var CRLF = []byte{'\r', '\n'}
-
-func (h *Handler) ForwardConnection(srcRWC io.ReadWriteCloser, accessAddr *transport.SocketAddress) error {
-	// len(password) + len(CRLF) = 16 + 2
-	headerSize := 16 + 2 + socksLikeRequestSizeInBytes(accessAddr)
-	firstPacketBs := pool.Get(ioutil.TCPBufSize)
-	pooledBsRecycled := false
-	defer func() {
-		if !pooledBsRecycled {
-			pool.Put(firstPacketBs)
-		}
-	}()
-	n, err := srcRWC.Read(firstPacketBs[headerSize:])
+func (c *Client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
+	err := netutil.ValidateTCP(network)
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, err
 	}
-	buf := bytes.NewBuffer(firstPacketBs[:0])
-	buf.Write(h.passwordWithCRLF[:])
-	buf.Write(CRLF)
-	writeSocksLikeConnectionCommandRequest(buf, accessAddr)
 
-	hostWithPort := h.proxyNode.Host + ":" + strconv.Itoa(h.proxyNode.TLSPort)
-	targetConn, err := netutil.DialTCP(hostWithPort)
+	targetHostWithPort := c.proxyNode.Host + ":" + strconv.Itoa(c.proxyNode.TLSPort)
+	targetConn, err := netutil.DialTCP(ctx, targetHostWithPort)
 	if err != nil {
-		return errors.Newf(err, "fail to connect to the TLS server %v", hostWithPort)
+		return nil, errors.Newf(err, "fail to connect to the TLS server %v", targetHostWithPort)
 	}
-	tlsConn := tls.Client(targetConn, h.tlsConfig)
-
-	_, err = tlsConn.Write(firstPacketBs[0 : headerSize+n])
-	pool.Put(firstPacketBs)
-	pooledBsRecycled = true
-	if err != nil {
-		_ = tlsConn.Close()
-		return errors.WithStack(err)
-	}
-	return ioutil.Pipe(srcRWC, tlsConn)
-}
-
-/*
-SOCKS5-like request
-+-----+------+----------+----------+
-| CMD | ATYP | DST.ADDR | DST.PORT |
-+-----+------+----------+----------+
-|  1  |  1   | Variable |    2     |
-+-----+------+----------+----------+
-*/
-
-func socksLikeRequestSizeInBytes(addr *transport.SocketAddress) int {
-	return 1 + socks.SocksLikeAddrSizeInBytes(addr)
-}
-
-func writeSocksLikeConnectionCommandRequest(buf *bytes.Buffer, addr *transport.SocketAddress) {
-	buf.WriteByte(socks.ConnectionCommandConnect)
-	socks.WriteSocksLikeAddr(buf, addr)
+	tlsConn := tls.Client(targetConn, c.tlsConfig)
+	return newClientConn(tlsConn, addr, c.passwordWithoutCRLF), nil
 }

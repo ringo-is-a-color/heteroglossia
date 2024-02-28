@@ -2,8 +2,10 @@ package http_socks
 
 import (
 	"bufio"
+	"context"
 	"net"
 	"strconv"
+	"sync/atomic"
 
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
@@ -13,27 +15,35 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
+	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/proxy"
 )
 
-func ListenRequests(httpSOCKS *conf.HTTPSOCKS, handler transport.ConnectionContinuationHandler) error {
+type Server struct {
+	AuthInfo *transport.HTTPSOCKSAuthInfo
+}
+
+var _ transport.Server = new(Server)
+
+func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient transport.Client) error {
 	// can't listen to IPv4 & IPv6 together due to https://github.com/golang/go/issues/9334
-	// so also listen to IPv4 one when using ::1 or ::
+	// so also listen to IPv4 one when using '::1' or '::'
 	var host = httpSOCKS.Host
 	authInfo := &transport.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
-	var ipv4RequestsHandlerForDualstack func() error
+	server := &Server{authInfo}
 	connHandler := func(conn net.Conn) {
-		err := handleRequest(conn, authInfo, handler)
+		err := server.HandleConnection(ctx, conn, targetClient)
 		_ = conn.Close()
 		if err != nil {
 			log.InfoWithError("fail to handle a HTTP/SOCKS request", err)
 		}
 	}
 
+	var ipv4RequestsHandlerForDualstack func() error
 	if host == "::1" {
 		ipv4Localhost := net.JoinHostPort("127.0.0.1", strconv.Itoa(int(httpSOCKS.Port)))
 		ipv4RequestsHandlerForDualstack = func() error {
-			return netutil.ListenTCPAndAccept(ipv4Localhost, nil, connHandler)
+			return netutil.ListenTCPAndServe(ctx, ipv4Localhost, connHandler)
 		}
 	} else if host == "::" {
 		// the Golang will listen both IPv4 & IPv6 when using the empty string for host
@@ -42,20 +52,35 @@ func ListenRequests(httpSOCKS *conf.HTTPSOCKS, handler transport.ConnectionConti
 
 	addr := net.JoinHostPort(host, strconv.Itoa(int(httpSOCKS.Port)))
 	return parRunWithFirstErrReturn(func() error {
-		return netutil.ListenTCPAndAccept(addr, func() {
+		var unsetProxy func()
+		var hasUnsetProxy atomic.Bool
+		return netutil.ListenTCPAndServeWithCallback(ctx, addr, connHandler, func(_ net.Listener) {
 			if httpSOCKS.SystemProxy {
 				log.Info("try to set the system proxy")
-				// do not use the 'host' variable directly because we changed it for ::
-				err := proxy.SetSystemProxy(httpSOCKS.Host, httpSOCKS.Port, authInfo)
+				// do not use the 'host' variable directly because we changed it for '::'
+				var err error
+				unsetProxyFunction, err := proxy.SetSystemProxy(httpSOCKS.Host, httpSOCKS.Port, authInfo)
 				if err != nil {
 					log.WarnWithError("fail to set the system proxy", err)
 				}
+				unsetProxy = func() {
+					if hasUnsetProxy.CompareAndSwap(false, true) {
+						unsetProxyFunction()
+					}
+				}
+				osutil.RegisterProgramTerminationHandler(func() {
+					unsetProxy()
+				})
 			}
-		}, connHandler)
+		}, func() {
+			if unsetProxy != nil {
+				unsetProxy()
+			}
+		})
 	}, ipv4RequestsHandlerForDualstack)
 }
 
-func handleRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler transport.ConnectionContinuationHandler) error {
+func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
 	b, err := ioutil.Read1(conn)
 	if err != nil {
 		return err
@@ -65,13 +90,13 @@ func handleRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler
 		return errors.New("SOCKS4 protocol is not supported, only SOCKS5 is supported")
 	case socks.Sock5Version:
 		log.Debug("request", "source", conn.RemoteAddr().String(), "type", "SOCKS5 Proxy")
-		return socks.HandleSOCKS5RequestWithFirstByte(conn, authInfo, handler)
+		return (&socks.Server{AuthInfo: s.AuthInfo}).HandleConnection(ctx, conn, targetClient)
 	default:
 		// assume this is an HTTP proxy request
 		log.Debug("request", "source", conn.RemoteAddr().String(), "type", "HTTP Proxy")
-		// 256 is a micro optimisation here to reduce the buffer size
+		// 256 is a micro optimization here to reduce the buffer size
 		bufReader := bufio.NewReaderSize(ioutil.NewBytesReadPreloadReadWriteCloser([]byte{b}, conn), 256)
-		return http.HandleRequest(conn, bufReader, authInfo, handler)
+		return (&http.Server{ConnBufReader: bufReader, AuthInfo: s.AuthInfo}).HandleConnection(ctx, conn, targetClient)
 	}
 }
 

@@ -22,12 +22,12 @@ func newServerInfo(hg *conf.Hg) *serverInfo {
 	return &serverInfo{hg, hg.Password.Raw[:], gcmTagOverhead}
 }
 
-func ListenRequests(hg *conf.Hg, handler transport.ConnectionContinuationHandler) error {
+func ListenRequests(hg *conf.Hg, targetClient transport.Client) error {
 	serverInfo := newServerInfo(hg)
 
 	addr := ":" + strconv.Itoa(serverInfo.hg.TCPPort)
-	return netutil.ListenTCPAndAccept(addr, nil, func(conn net.Conn) {
-		err := handleRequest(conn, serverInfo, handler)
+	return netutil.ListenTCPAndServe(nil, addr, func(conn net.Conn) {
+		err := handleRequest(conn, serverInfo, targetClient)
 		_ = conn.Close()
 		if err != nil {
 			log.InfoWithError("fail to handle a request over TCP", err)
@@ -35,7 +35,7 @@ func ListenRequests(hg *conf.Hg, handler transport.ConnectionContinuationHandler
 	})
 }
 
-func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.ConnectionContinuationHandler) error {
+func handleRequest(conn net.Conn, serverInfo *serverInfo, targetClient transport.Client) error {
 	saltSize := len(serverInfo.preSharedKey)
 	reqSaltWithFixedLenHeaderEncryptedSize := saltSize + reqFixedLenHeaderSize + serverInfo.aeadOverhead
 	reqSaltWithFixedLenHeaderEncryptedBs := pool.Get(reqSaltWithFixedLenHeaderEncryptedSize)
@@ -50,11 +50,11 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 	if err != nil {
 		return err
 	}
-	aeadRWC := new(aeadReadWriteCloser)
+	aeadRWC := new(aeadClientConn)
 	aeadRWC.setAEADReader(respAEAD)
 
 	reqFixedLenHeaderEncryptedBs := reqSaltWithFixedLenHeaderEncryptedBs[saltSize:]
-	err = aeadRWC.Decrypt(reqFixedLenHeaderEncryptedBs[:0], reqFixedLenHeaderEncryptedBs)
+	err = aeadRWC.decrypt(reqFixedLenHeaderEncryptedBs[:0], reqFixedLenHeaderEncryptedBs)
 	if err != nil {
 		return err
 	}

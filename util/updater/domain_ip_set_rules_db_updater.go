@@ -12,11 +12,11 @@ const (
 	domainIPSetRulesFileURL          = "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db"
 	domainIPSetRulesFileSHA256SumURL = "https://github.com/ringo-is-a-color/domain-ip-set-rules/raw/release/domain-ip-set-rules.db.sha256sum"
 
-	rulesFileNeedUpdateInterval = 15 * 10 * time.Hour
+	ruleFileNeedUpdateInterval = 15 * 10 * time.Hour
 )
 
-func UpdateRulesFiles(client *http.Client) (bool, error) {
-	update, err := needUpdateFile(rule.DomainIPSetRulesDBFilename, rulesFileNeedUpdateInterval)
+func UpdateRuleFile(client *http.Client) (bool, error) {
+	update, err := needUpdateFile(rule.DomainIPSetRulesDBFilename, ruleFileNeedUpdateInterval)
 	if err != nil {
 		return false, err
 	}

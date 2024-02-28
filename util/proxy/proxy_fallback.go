@@ -7,6 +7,6 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 )
 
-func SetSystemProxy(_ string, _ uint16, _ *transport.HTTPSOCKSAuthInfo) error {
-	return errors.New("doesn't support the system proxy in this OS")
+func SetSystemProxy(_ string, _ uint16, _ *transport.HTTPSOCKSAuthInfo) (unsetProxy func(), err error) {
+	return nil, errors.New("doesn't support the system proxy in this OS")
 }

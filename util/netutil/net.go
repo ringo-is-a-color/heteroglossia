@@ -17,59 +17,59 @@ var (
 	listeners    = sync.Map{}
 )
 
-func DialTCP(addr string) (*net.TCPConn, error) {
-	conn, err := dial.Dial("tcp", addr)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	tcpConn := conn.(*net.TCPConn)
+func Dial(ctx context.Context, network, addr string) (net.Conn, error) {
+	return errors.WithStack2(dial.DialContext(ctx, network, addr))
+}
+
+func DialTCP(ctx context.Context, addr string) (*net.TCPConn, error) {
+	conn, err := Dial(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	return tcpConn, nil
+	return conn.(*net.TCPConn), nil
 }
 
-func ListenTCPAndAccept(addr string, listenSuccessCallback func(), connHandler func(conn net.Conn)) error {
-	ln, err := listenConfig.Listen(context.Background(), "tcp", addr)
+func ListenTCPAndAccept(ctx context.Context, addr string,
+	listenHandler func(ln net.Listener) error, listenFinishedCallback func()) error {
+	ln, err := listenConfig.Listen(ctx, "tcp", addr)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer closeListener(ln)
 	addListener(ln)
-	if listenSuccessCallback != nil {
-		listenSuccessCallback()
-	}
-	return accept(ln, connHandler)
+	defer func() {
+		removeListener(ln)
+		if listenFinishedCallback != nil {
+			listenFinishedCallback()
+		}
+	}()
+	return listenHandler(ln)
 }
 
-func ListenTLSAndAccept(addr string, config *tls.Config, connHandler func(conn net.Conn)) error {
-	ln, err := listenConfig.Listen(context.Background(), "tcp", addr)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer closeListener(ln)
-	addListener(ln)
-	tlsLn := tls.NewListener(ln, config)
-	return accept(tlsLn, connHandler)
+func ListenTCPAndServe(ctx context.Context, addr string, connHandler func(conn net.Conn)) error {
+	return ListenTCPAndServeWithCallback(ctx, addr, connHandler, nil, nil)
 }
 
-func ListenHTTPAndServe(addr string, handler http.Handler) error {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer closeListener(ln)
-	addListener(ln)
-	return http.Serve(ln, handler)
+func ListenTCPAndServeWithCallback(ctx context.Context, addr string, connHandler func(conn net.Conn),
+	listenSuccessCallback func(ln net.Listener), listenFinishedCallback func()) error {
+	return ListenTCPAndAccept(ctx, addr, func(ln net.Listener) error {
+		if listenSuccessCallback != nil {
+			listenSuccessCallback(ln)
+		}
+		return accept(ln, connHandler)
+	}, listenFinishedCallback)
 }
 
-func ListenTCP(addr string) (net.Listener, error) {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	addListener(ln)
-	return ln, nil
+func ListenHTTPAndServe(ctx context.Context, addr string, handler http.Handler) error {
+	return ListenTCPAndAccept(ctx, addr, func(ln net.Listener) error {
+		return http.Serve(ln, handler)
+	}, nil)
+}
+
+func ListenTLSAndAccept(ctx context.Context, addr string, config *tls.Config, connHandler func(conn net.Conn)) error {
+	return ListenTCPAndAccept(ctx, addr, func(ln net.Listener) error {
+		tlsLn := tls.NewListener(ln, config)
+		return accept(tlsLn, connHandler)
+	}, nil)
 }
 
 func StopAllListeners() {
@@ -77,11 +77,6 @@ func StopAllListeners() {
 		_ = key.(net.Listener).Close()
 		return true
 	})
-}
-
-func closeListener(ln net.Listener) {
-	removeListener(ln)
-	_ = ln.Close()
 }
 
 func addListener(ln net.Listener) {

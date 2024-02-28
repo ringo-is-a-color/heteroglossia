@@ -1,12 +1,9 @@
 package tls_carrier
 
 import (
-	"bufio"
-	"net"
+	"context"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strconv"
 	"testing"
 
 	_ "github.com/flashlabs/rootpath"
@@ -21,41 +18,19 @@ func TestClientServerConnection(t *testing.T) {
 	assert.Nil(t, err)
 	if serverConf.Inbounds.Hg != nil {
 		go func() {
-			err := ListenRequests(serverConf.Inbounds.Hg, new(direct.Handler))
+			err := ListenRequests(context.Background(), serverConf.Inbounds.Hg, new(direct.Client))
 			assert.Nil(t, err)
 		}()
 	}
-
-	tlsClient, err := NewTLSCarrierClient(toProxyNode(serverConf.Inbounds.Hg), false)
+	tlsClient, err := NewClient(toProxyNode(serverConf.Inbounds.Hg), false)
 	assert.Nil(t, err)
-
 	server := startWebServer()
 	defer server.Close()
-	parse, err := url.Parse(server.URL)
-	assert.Nil(t, err)
-	port, err := strconv.ParseUint(parse.Port(), 10, 16)
-	assert.Nil(t, err)
-	conn, rp := net.Pipe()
-	defer func(conn net.Conn) {
-		_ = conn.Close()
-	}(conn)
-	go func() {
-		err := tlsClient.ForwardConnection(rp, transport.NewSocketAddressByDomain(parse.Hostname(), uint16(port)))
-		_ = rp.Close()
-		if err != nil {
-			assert.Nil(t, err)
-		}
-	}()
-	assert.Nil(t, err)
 
-	req, err := http.NewRequest("GET", server.URL, nil)
-	assert.Nil(t, err)
-	err = req.Write(conn)
-	assert.Nil(t, err)
-	respReader := bufio.NewReader(conn)
-	resp, err := http.ReadResponse(respReader, req)
-	assert.Nil(t, err)
+	httpClient := transport.HTTPClientThroughRouter(tlsClient)
+	resp, err := httpClient.Get(server.URL)
 
+	assert.Nil(t, err)
 	assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 300)
 }
 

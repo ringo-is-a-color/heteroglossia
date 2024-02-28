@@ -9,11 +9,8 @@ import (
 
 func RandNBytes(n int) ([]byte, error) {
 	bs := make([]byte, n)
-	_, err := rand.Read(bs)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	return bs, nil
+	n, err := rand.Read(bs)
+	return bs, errors.WithStack(err)
 }
 
 func RandBytes(bs []byte) (int, error) {
@@ -37,7 +34,7 @@ func WeightedIntN(n int) func() int {
 		}
 		r := mathRand.Float32() * totalWeight
 		for i := range n {
-			r -= weights[n]
+			r -= weights[i]
 			if r <= 0.0 {
 				return i
 			}

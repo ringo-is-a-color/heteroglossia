@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"net"
 	"net/netip"
 	"strconv"
@@ -85,14 +86,22 @@ func ToSocketAddr(host string, requirePort bool, defaultPort uint16) (*SocketAdd
 	return toSocketAddr(host, uint16(port), false)
 }
 
-// not handle IP addr currently
+func (addr *SocketAddress) ToHostStr() string {
+	port := strconv.Itoa(int(addr.Port))
+	switch addr.AddrType {
+	case IPv4, IPv6:
+		return net.JoinHostPort(addr.IP.String(), port)
+	default:
+		return net.JoinHostPort(addr.Domain, port)
+	}
+}
 
-func ToSocketAddrFromNetworkAddr(network, host string) (*SocketAddress, error) {
+func toSocketAddrFromNetworkAddr(ctx context.Context, network, host string) (*SocketAddress, error) {
 	host, portStr, err := net.SplitHostPort(host)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	port, err := net.LookupPort(network, portStr)
+	port, err := net.DefaultResolver.LookupPort(ctx, network, portStr)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -109,14 +118,4 @@ func toSocketAddr(host string, port uint16, ipv6Required bool) (*SocketAddress, 
 		return nil, errors.Newf("require IPv6 address but found %v", host)
 	}
 	return NewSocketAddressByIP(&ip, port), nil
-}
-
-func (addr *SocketAddress) ToHostStr() string {
-	port := strconv.Itoa(int(addr.Port))
-	switch addr.AddrType {
-	case IPv4, IPv6:
-		return net.JoinHostPort(addr.IP.String(), port)
-	default:
-		return net.JoinHostPort(addr.Domain, port)
-	}
 }

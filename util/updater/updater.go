@@ -163,7 +163,7 @@ func extractHgBinaryTarGz(tarGzFile *os.File) (string, error) {
 	for {
 		header, err = tarReader.Next()
 
-		if err == io.EOF {
+		if errors.IsIoEof(err) {
 			if newDownloadHgBinaryPath == "" {
 				return "", errors.Newf("fail to find the hg binary in the downloaded compressed file %v",
 					tarGzFile.Name())
@@ -236,9 +236,5 @@ func replaceFile(src *os.File, dstFilepath string) error {
 			return errors.WithStack(err)
 		}
 	}
-	err = os.Rename(dstFilepath+".new", dstFilepath)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	return err
+	return errors.WithStack(os.Rename(dstFilepath+".new", dstFilepath))
 }

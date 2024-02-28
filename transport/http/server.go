@@ -2,6 +2,7 @@ package http
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +12,13 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 )
+
+type Server struct {
+	ConnBufReader *bufio.Reader
+	AuthInfo      *transport.HTTPSOCKSAuthInfo
+}
+
+var _ transport.Server = new(Server)
 
 // see https://www.mnot.net/blog/2011/07/11/what_proxies_must_do point 1
 // point 0: always advise HTTP 1.1
@@ -22,11 +30,10 @@ import (
 var connectSuccessBytes = []byte("HTTP/1.1 200 OK\r\n\r\n")
 
 // forked from https://github.com/database64128/shadowsocks-go/blob/88c2d63ccd0b022f76902195ceb1559eaf15a3a7/http/server.go
-// always consider connection persistent and don't take much care of HTTP connection header to make the impl simper
+// always consider connection persistent and take little care of HTTP connection header to make the impl simper
 
-func HandleRequest(conn net.Conn, connBufReader *bufio.Reader, authInfo *transport.HTTPSOCKSAuthInfo, handler transport.ConnectionContinuationHandler) error {
-	// micro optimisation here to reduce the buffer size
-	req, err := readRequest(connBufReader)
+func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
+	req, err := readRequest(s.ConnBufReader)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -47,9 +54,9 @@ func HandleRequest(conn net.Conn, connBufReader *bufio.Reader, authInfo *transpo
 	if err != nil {
 		return errors.Join(err, httpError(req, conn, http.StatusBadRequest))
 	}
-	if !authInfo.IsEmpty() {
+	if !s.AuthInfo.IsEmpty() {
 		username, password, ok := parse(req)
-		if !ok || authInfo.NotEqual2(username, password) {
+		if !ok || s.AuthInfo.NotEqual2(username, password) {
 			return errors.Join(errors.New("no authentication info, or incorrect username/password"),
 				httpError(req, conn, http.StatusProxyAuthRequired))
 		}
@@ -59,7 +66,7 @@ func HandleRequest(conn net.Conn, connBufReader *bufio.Reader, authInfo *transpo
 		if err != nil {
 			return err
 		}
-		return handler.ForwardConnection(conn, addr)
+		return transport.ForwardTCP(ctx, addr, conn, targetClient)
 	}
 
 	lp, rp := net.Pipe()
@@ -92,9 +99,9 @@ func HandleRequest(conn net.Conn, connBufReader *bufio.Reader, authInfo *transpo
 			if req.Close || resp.Close {
 				break
 			}
-			req, werr = readRequest(connBufReader)
+			req, werr = readRequest(s.ConnBufReader)
 			if werr != nil {
-				if werr != io.EOF {
+				if !errors.IsIoEof(werr) {
 					werr = errors.WithStack(werr)
 				}
 				break
@@ -110,7 +117,7 @@ func HandleRequest(conn net.Conn, connBufReader *bufio.Reader, authInfo *transpo
 		}
 	}()
 
-	return handler.ForwardConnection(rp, addr)
+	return transport.ForwardTCP(ctx, addr, rp, targetClient)
 }
 
 func parse(r *http.Request) (username, password string, ok bool) {

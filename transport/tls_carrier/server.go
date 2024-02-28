@@ -2,6 +2,7 @@ package tls_carrier
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -20,7 +21,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
-type serverInfo struct {
+type Server struct {
 	hg                           *conf.Hg
 	tlsConfig                    *tls.Config
 	passwordWithCRLF             [16]byte
@@ -29,51 +30,53 @@ type serverInfo struct {
 	tlsBadAuthFallbackSiteDir    string
 }
 
-func newServerInfo(hg *conf.Hg) (*serverInfo, error) {
-	serverInfo := &serverInfo{hg: hg}
+var _ transport.Server = new(Server)
+
+func newServer(ctx context.Context, hg *conf.Hg) (*Server, error) {
+	server := &Server{hg: hg}
 	if hg.TLSCertKeyPair == nil {
-		tlsConfig, err := getTLSConfigWithAutomatedCertificate(hg.Host)
+		tlsConfig, err := tlsConfigWithAutomatedCertificate(ctx, hg.Host)
 		if err != nil {
 			return nil, err
 		}
-		serverInfo.tlsConfig = tlsConfig
+		server.tlsConfig = tlsConfig
 	} else {
 		cert, err := tls.LoadX509KeyPair(hg.TLSCertKeyPair.CertFile, hg.TLSCertKeyPair.KeyFile)
 		if err != nil {
 			return nil, errors.New(err, "fail to load TLS Certificate/Key pair files")
 		}
-		serverInfo.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+		server.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}
-	serverInfo.passwordWithCRLF = replaceCRLF(hg.Password.Raw)
-	serverInfo.trojanPassword = toTrojanPassword(hg.Password.String)
+	server.passwordWithCRLF = replaceCRLF(hg.Password.Raw)
+	server.trojanPassword = toTrojanPassword(hg.Password.String)
 
-	ln, err := netutil.ListenTCP(":0")
-	if err != nil {
-		log.Fatal("fail to listen a port", err)
-	}
+	port := make(chan uint16, 1)
 	go func() {
-		var handler http.Handler = nil
-		if hg.TLSBadAuthFallbackSiteDir != "" {
-			handler = http.FileServer(http.Dir(hg.TLSBadAuthFallbackSiteDir))
-		}
-		err := http.Serve(ln, handler)
+		err := netutil.ListenTCPAndAccept(ctx, ":0", func(ln net.Listener) error {
+			var handler http.Handler = nil
+			if hg.TLSBadAuthFallbackSiteDir != "" {
+				handler = http.FileServer(http.Dir(hg.TLSBadAuthFallbackSiteDir))
+			}
+			port <- uint16(ln.Addr().(*net.TCPAddr).Port)
+			return errors.WithStack(http.Serve(ln, handler))
+		}, nil)
 		if err != nil {
 			log.Fatal("fail to serve a fallback server", err)
 		}
 	}()
-	serverInfo.tlsBadAuthFallbackServerPort = uint16(ln.Addr().(*net.TCPAddr).Port)
-	return serverInfo, nil
+	server.tlsBadAuthFallbackServerPort = <-port
+	return server, nil
 }
 
-func ListenRequests(hg *conf.Hg, handler transport.ConnectionContinuationHandler) error {
-	serverInfo, err := newServerInfo(hg)
+func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Client) error {
+	server, err := newServer(ctx, hg)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	addr := ":" + strconv.Itoa(serverInfo.hg.TLSPort)
-	return netutil.ListenTLSAndAccept(addr, serverInfo.tlsConfig, func(conn net.Conn) {
-		err := handleRequest(conn, serverInfo, handler)
+	addr := ":" + strconv.Itoa(server.hg.TLSPort)
+	return netutil.ListenTLSAndAccept(ctx, addr, server.tlsConfig, func(conn net.Conn) {
+		err := server.HandleConnection(ctx, conn, targetClient)
 		_ = conn.Close()
 		if err != nil {
 			log.InfoWithError("fail to handle a request over TLS", err)
@@ -81,7 +84,7 @@ func ListenRequests(hg *conf.Hg, handler transport.ConnectionContinuationHandler
 	})
 }
 
-func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.ConnectionContinuationHandler) error {
+func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
 	log.Debug("request", "source", conn.RemoteAddr().String(), "type", "TLS carrier")
 	// the tls_carrier protocol use 18 bytes for password(16) + CRLF(2)
 	// the trojan protocol use 58 bytes for password(56) + CRLF(2)
@@ -89,7 +92,10 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 	bufReader := bufio.NewReaderSize(conn, 128)
 	textProtoReader := newTextprotoReader(bufReader)
 
-	// read one line in order to make our server like a normal HTTP server
+	// read one line to make our server like a normal HTTP server
+	// for a TLS carrier client, it uses a password without CRLF
+	// for a Trojan client, it uses a hex string password which doesn't include CRLF bytes
+	// so we can always load a line with a password in both cases
 	lineBs, err := textProtoReader.ReadLineBytes()
 	putTextprotoReader(textProtoReader)
 	if err != nil {
@@ -97,12 +103,12 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 	}
 
 	isTrojan := false
-	if len(lineBs) != 16 || [16]byte(lineBs[0:16]) != serverInfo.passwordWithCRLF {
-		if len(lineBs) != 56 || [56]byte(lineBs[0:56]) != serverInfo.trojanPassword {
+	if len(lineBs) != 16 || [16]byte(lineBs[0:16]) != s.passwordWithCRLF {
+		if len(lineBs) != 56 || [56]byte(lineBs[0:56]) != s.trojanPassword {
 			unreadBufSize := bufReader.Buffered()
 			unreadBs, err := bufReader.Peek(unreadBufSize)
 			if err != nil {
-				log.Fatal("fail to peek buff", err)
+				return errors.WithStack(err)
 			}
 			// 2 = len(CRLF)
 			unrelatedBs := pool.Get(len(lineBs) + 2 + len(unreadBs))[:0]
@@ -110,8 +116,8 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 			unrelatedBs = append(unrelatedBs, CRLF...)
 			unrelatedBs = append(unrelatedBs, unreadBs...)
 			ip := netip.IPv6Loopback()
-			addr := transport.NewSocketAddressByIP(&ip, serverInfo.tlsBadAuthFallbackServerPort)
-			return handler.ForwardConnection(ioutil.NewBytesReadPreloadReadWriteCloser(unrelatedBs, conn), addr)
+			fallbackAddr := transport.NewSocketAddressByIP(&ip, s.tlsBadAuthFallbackServerPort)
+			return transport.ForwardTCP(ctx, fallbackAddr, ioutil.NewBytesReadPreloadReadWriteCloser(unrelatedBs, conn), targetClient)
 		} else {
 			isTrojan = true
 		}
@@ -121,7 +127,7 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 	if commandType != socks.ConnectionCommandConnect {
 		return errors.Newf("unsupported command type %v", lineBs[1])
 	}
-	dest, err := socks.ReadSOCKS5Address(bufReader)
+	accessAddr, err := socks.ReadSOCKS5Address(bufReader)
 	if err != nil {
 		return err
 	}
@@ -136,9 +142,9 @@ func handleRequest(conn net.Conn, serverInfo *serverInfo, handler transport.Conn
 	bufSize := bufReader.Buffered()
 	unreadBs, err := bufReader.Peek(bufSize)
 	if err != nil {
-		log.Fatal("fail to peek buff", err)
+		return errors.WithStack(err)
 	}
-	return handler.ForwardConnection(ioutil.NewBytesReadPreloadReadWriteCloser(unreadBs, conn), dest)
+	return transport.ForwardTCP(ctx, accessAddr, ioutil.NewBytesReadPreloadReadWriteCloser(unreadBs, conn), targetClient)
 }
 
 var textprotoReaderPool sync.Pool

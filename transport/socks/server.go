@@ -1,6 +1,7 @@
 package socks
 
 import (
+	"context"
 	"io"
 	"net"
 
@@ -9,6 +10,12 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"golang.org/x/exp/slices"
 )
+
+type Server struct {
+	AuthInfo *transport.HTTPSOCKSAuthInfo
+}
+
+var _ transport.Server = new(Server)
 
 const (
 	Sock4Version byte = 4
@@ -55,11 +62,14 @@ var (
 	helloNoAcceptableMethodsBytes = []byte{Sock5Version, helloNoAcceptableMethods}
 )
 
-func HandleSOCKS5RequestWithFirstByte(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler transport.ConnectionContinuationHandler) error {
-	return handleClientHelloRequest(conn, authInfo, handler)
+// handle SOCKS5 request without the first version byte
+
+func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
+	return handleClientHelloRequest(ctx, conn, s.AuthInfo, targetClient)
 }
 
-func handleClientHelloRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo, handler transport.ConnectionContinuationHandler) error {
+func handleClientHelloRequest(ctx context.Context, conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo,
+	targetClient transport.Client) error {
 	// the version byte of the SOCKS5 protocol is already checked in the http_socks package
 	// so we start to check the 'methods' directly
 	methods, err := ioutil.ReadByUint8(conn)
@@ -83,7 +93,7 @@ func handleClientHelloRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthIn
 	if err != nil {
 		return err
 	}
-	return handleClientConnectionRequest(conn, handler)
+	return handleClientConnectionRequest(ctx, conn, targetClient)
 }
 
 /*
@@ -162,12 +172,12 @@ var connectionCommandNotSupportedBytes = []byte{Sock5Version, connectionCommandN
 	connectionAddressIpv4, 0, 0, 0, 0, 0}
 
 // According to the rfc1928, we need to return the source address/port that SOCKS5 server used to connect to the target host,
-// but we just return dummy values here as these values are not useful to client and some SOCKS5 server return the dummy values.
+// but we just return dummy values here as these values are not useful to a client and some SOCKS5 server returns the dummy values.
 // See https://stackoverflow.com/q/43013695, https://stackoverflow.com/q/39990056, https://stackoverflow.com/q/72753182
 var connectionSucceededPrefix = []byte{Sock5Version, connectionSucceeded, connectionReserved,
 	1, 0, 0, 0, 0, 0, 0}
 
-func handleClientConnectionRequest(conn net.Conn, handler transport.ConnectionContinuationHandler) error {
+func handleClientConnectionRequest(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
 	_, bs, err := ioutil.ReadN(conn, 3)
 	if err != nil {
 		return err
@@ -180,7 +190,7 @@ func handleClientConnectionRequest(conn net.Conn, handler transport.ConnectionCo
 		return errors.Join(errors.Newf("the command type %v is not supported, only command type 0x01 is supported", bs[1]), err)
 	}
 
-	dest, err := ReadSOCKS5Address(conn)
+	accessAddr, err := ReadSOCKS5Address(conn)
 	if err != nil {
 		return err
 	}
@@ -188,5 +198,5 @@ func handleClientConnectionRequest(conn net.Conn, handler transport.ConnectionCo
 	if err != nil {
 		return err
 	}
-	return handler.ForwardConnection(conn, dest)
+	return transport.ForwardTCP(ctx, accessAddr, conn, targetClient)
 }

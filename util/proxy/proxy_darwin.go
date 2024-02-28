@@ -8,22 +8,15 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/cmd"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
-	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
 )
 
 // not work when macOS's 'System Settings -> VPN' is enabled
 
-func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) error {
-	serviceName, err := getCurrentNetworkServiceName()
+func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) (unsetProxy func(), err error) {
+	serviceName, err := currentNetworkServiceName()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	osutil.RegisterProgramTerminationHandler(func() {
-		err := unsetSystemProxy(serviceName, host, !authInfo.IsEmpty())
-		if err != nil {
-			log.WarnWithError("fail to disable the macOS system proxy when shutdown", err)
-		}
-	})
 	var proxySetCommand string
 	if authInfo.IsEmpty() {
 		proxySetCommand = fmt.Sprintf(trimNewLinesForRawStringLiteral(`networksetup -setwebproxy %[1]v %[2]v %[3]v off && 
@@ -40,7 +33,15 @@ networksetup -setsocksfirewallproxy %[1]v %[2]v %[3]v on %[4]v %[5]v`),
 			serviceName, host, port, authInfo.Username, authInfo.Password)
 	}
 	_, err = cmd.Run("/bin/sh", "-c", proxySetCommand)
-	return err
+	if err != nil {
+		log.WarnWithError("fail to set system proxy for macOS", err)
+	}
+	return func() {
+		err := unsetSystemProxy(serviceName, host, !authInfo.IsEmpty())
+		if err != nil {
+			log.WarnWithError("fail to disable the macOS system proxy when shutdown", err)
+		}
+	}, err
 }
 
 func unsetSystemProxy(serviceName, proxyHost string, hasAuthInfo bool) error {
@@ -69,7 +70,7 @@ security delete-internet-password -s %[1]v`),
 	_, _ = cmd.Run("/bin/sh", "-c", proxyAuthInfoUnSetCommand)
 }
 
-func getCurrentNetworkServiceName() (string, error) {
+func currentNetworkServiceName() (string, error) {
 	interfaceOutput, err := cmd.RunWithInput("/usr/sbin/scutil", "show State:/Network/Global/IPv4\n")
 	if err != nil {
 		return "", err

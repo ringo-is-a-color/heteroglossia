@@ -9,13 +9,9 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/cmd"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
-	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
 )
 
-func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) error {
-	osutil.RegisterProgramTerminationHandler(func() {
-		unsetSystemProxy()
-	})
+func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) (unsetProxy func(), err error) {
 	// https://developer-old.gnome.org/ProxyConfiguration/
 	// org.gnome.system.proxy use-same-proxy and org.gnome.system.proxy.http enabled are not used so don't use them
 	gnomeProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`gsettings set org.gnome.system.proxy mode 'manual' && 
@@ -47,7 +43,7 @@ gsettings set org.gnome.system.proxy.socks port %[2]v`),
 	if authInfo.IsEmpty() {
 		kdeProxyHostWithPort = fmt.Sprintf("%v:%v", host, port)
 	} else {
-		// there is a KDE bug that it fails to set a URL including both auth info and IPv6 address (e.g. http://username:password@[::1]:1080
+		// there is a KDE bug that it fails to set a URL including both auth info and IPv6 address (e.g., http://username:password@[::1]:1080
 		kdeProxyHostWithPort = fmt.Sprintf("%v:%v@%v:%v", url.QueryEscape(authInfo.Username), url.QueryEscape(authInfo.Password), host, port)
 	}
 	kde5ProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
@@ -59,7 +55,9 @@ kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy '%v'`)
 	if err != nil {
 		log.WarnWithError("fail to set system proxy for KDE 5", err)
 	}
-	return nil
+	return func() {
+		unsetSystemProxy()
+	}, nil
 }
 
 func unsetSystemProxy() {
