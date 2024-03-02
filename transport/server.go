@@ -13,16 +13,16 @@ type Server interface {
 	HandleConnection(ctx context.Context, conn net.Conn, targetClient Client) error
 }
 
-func ForwardTCP(ctx context.Context, addr *SocketAddress, srcRwc io.ReadWriteCloser, targetClient Client) error {
-	return forward(ctx, "tcp", addr, srcRwc, targetClient)
+func ForwardTCP(ctx context.Context, accessAddr *SocketAddress, srcRwc io.ReadWriteCloser, targetClient Client) error {
+	return forward(ctx, "tcp", accessAddr, srcRwc, targetClient)
 }
 
-func forward(ctx context.Context, network string, addr *SocketAddress, srcRwc io.ReadWriteCloser, targetClient Client) error {
+func forward(ctx context.Context, network string, accessAddr *SocketAddress, srcRwc io.ReadWriteCloser, targetClient Client) error {
 	select {
 	case <-ctx.Done():
 		return errors.WithStack(ctx.Err())
 	default:
-		targetConn, err := targetClient.Dial(ctx, network, addr)
+		targetConn, err := targetClient.Dial(ctx, network, accessAddr)
 		if err != nil {
 			_ = srcRwc.Close()
 			return err

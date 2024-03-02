@@ -45,17 +45,19 @@ func ListenTCPAndAccept(ctx context.Context, addr string,
 	return listenHandler(ln)
 }
 
-func ListenTCPAndServe(ctx context.Context, addr string, connHandler func(conn net.Conn)) error {
+func ListenTCPAndServe(ctx context.Context, addr string, connHandler func(tcpConn *net.TCPConn)) error {
 	return ListenTCPAndServeWithCallback(ctx, addr, connHandler, nil, nil)
 }
 
-func ListenTCPAndServeWithCallback(ctx context.Context, addr string, connHandler func(conn net.Conn),
+func ListenTCPAndServeWithCallback(ctx context.Context, addr string, connHandler func(tcpConn *net.TCPConn),
 	listenSuccessCallback func(ln net.Listener), listenFinishedCallback func()) error {
 	return ListenTCPAndAccept(ctx, addr, func(ln net.Listener) error {
 		if listenSuccessCallback != nil {
 			listenSuccessCallback(ln)
 		}
-		return accept(ln, connHandler)
+		return accept(ln, func(conn net.Conn) {
+			connHandler(conn.(*net.TCPConn))
+		})
 	}, listenFinishedCallback)
 }
 

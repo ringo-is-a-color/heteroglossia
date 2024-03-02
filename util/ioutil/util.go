@@ -35,7 +35,7 @@ func ReadN(r io.Reader, n int) (int, []byte, error) {
 func ReadOnceExpectFull(r io.Reader, buf []byte) (int, error) {
 	count, err := r.Read(buf)
 	if err == nil && count < len(buf) {
-		return count, errors.Newf("expected %v byte(s) in one read call, but got %v", len(buf), count)
+		return count, errors.Newf("expect %v byte(s) in one read call, but got %v", len(buf), count)
 	}
 	if !errors.IsIoEof(err) {
 		err = errors.WithStack(err)

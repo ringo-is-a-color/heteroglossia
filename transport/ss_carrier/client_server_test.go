@@ -1,4 +1,4 @@
-package tls_carrier
+package ss_carrier
 
 import (
 	"testing"
@@ -13,14 +13,13 @@ func TestClientServerConnection(t *testing.T) {
 }
 
 func newClient(serverConf *conf.Config) (transport.Client, error) {
-	return NewClient(toProxyNode(serverConf.Inbounds.Hg), false)
+	return NewClient(toProxyNode(serverConf.Inbounds.Hg)), nil
 }
 
 func toProxyNode(hg *conf.Hg) *conf.ProxyNode {
 	return &conf.ProxyNode{
-		Host:        hg.Host,
-		Password:    hg.Password,
-		TLSPort:     hg.TLSPort,
-		TLSCertFile: hg.TLSCertKeyPair.CertFile,
+		Host:     hg.Host,
+		Password: hg.Password,
+		TCPPort:  hg.TCPPort,
 	}
 }

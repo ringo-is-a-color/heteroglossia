@@ -12,26 +12,22 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
-type ClientConn struct {
+type clientConn struct {
 	net.Conn
 	accessAddr          *transport.SocketAddress
 	passwordWithCRLF    [16]byte
 	hasWriteFirstPacket bool
 }
 
-var _ net.Conn = new(ClientConn)
-var _ io.ReaderFrom = new(ClientConn)
-var _ io.WriterTo = new(ClientConn)
+var _ net.Conn = new(clientConn)
+var _ io.ReaderFrom = new(clientConn)
+var _ io.WriterTo = new(clientConn)
 
-func newClientConn(conn net.Conn, accessAddr *transport.SocketAddress, passwordWithoutCRLF [16]byte) *ClientConn {
-	return &ClientConn{conn, accessAddr, passwordWithoutCRLF, false}
+func newClientConn(conn net.Conn, accessAddr *transport.SocketAddress, passwordWithoutCRLF [16]byte) *clientConn {
+	return &clientConn{conn, accessAddr, passwordWithoutCRLF, false}
 }
 
-func (c *ClientConn) Write(b []byte) (n int, err error) {
-	if len(b) <= 0 {
-		return 0, nil
-	}
-
+func (c *clientConn) Write(b []byte) (n int, err error) {
 	if !c.hasWriteFirstPacket {
 		c.hasWriteFirstPacket = true
 		return c.writeClientFirstPacket(b)
@@ -49,7 +45,7 @@ https://trojan-gfw.github.io/trojan/protocol
 +-----------------------+---------+----------------+---------+----------+
 */
 
-func (c *ClientConn) writeClientFirstPacket(payload []byte) (int, error) {
+func (c *clientConn) writeClientFirstPacket(payload []byte) (int, error) {
 	// 16 + 2 = len(password) + len(CRLF)
 	// we don't write the second CRLF like Trojan protocol
 	headerSize := 16 + 2 + socksLikeRequestSizeInBytes(c.accessAddr)
@@ -67,7 +63,7 @@ func (c *ClientConn) writeClientFirstPacket(payload []byte) (int, error) {
 	return n, errors.WithStack(err)
 }
 
-func (c *ClientConn) ReadFrom(r io.Reader) (n int64, err error) {
+func (c *clientConn) ReadFrom(r io.Reader) (n int64, err error) {
 	var count int
 	if !c.hasWriteFirstPacket {
 		c.hasWriteFirstPacket = true
@@ -93,7 +89,7 @@ func (c *ClientConn) ReadFrom(r io.Reader) (n int64, err error) {
 	return n + int64(count), err
 }
 
-func (c *ClientConn) WriteTo(w io.Writer) (n int64, err error) {
+func (c *clientConn) WriteTo(w io.Writer) (n int64, err error) {
 	return io.Copy(w, c.Conn)
 }
 

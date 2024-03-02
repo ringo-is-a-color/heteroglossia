@@ -33,8 +33,7 @@ func (c *Client) Dial(ctx context.Context, network string, addr *transport.Socke
 		return nil, err
 	}
 
-	saltSize := len(c.preSharedKey)
-	clientSalt, err := randutil.RandNBytes(saltSize)
+	clientSalt, err := generateSalt(c.preSharedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +44,7 @@ func (c *Client) Dial(ctx context.Context, network string, addr *transport.Socke
 	if err != nil {
 		return nil, errors.Newf(err, "fail to connect to the TCP server %v", hostWithPort)
 	}
-	return newAEADClientConn(targetConn, addr, c.preSharedKey, clientSalt, c.aeadOverhead), nil
+	return newClientConn(targetConn, addr, c.preSharedKey, clientSalt, c.aeadOverhead), nil
 }
 
 // https://gfw.report/publications/usenixsecurity23/en/

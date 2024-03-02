@@ -1,62 +1,49 @@
 package ss_carrier
 
 import (
+	"context"
 	"net"
 	"strconv"
 
-	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
-	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
-type serverInfo struct {
+type Server struct {
 	hg           *conf.Hg
 	preSharedKey []byte
 	aeadOverhead int
+
+	// we can use '[16]byte' here actually, but we still use string here
+	// because we may support "2022-blake3-aes-256-gcm" later which uses '[32]byte'
+	saltPool *saltPool[string]
 }
 
-func newServerInfo(hg *conf.Hg) *serverInfo {
-	return &serverInfo{hg, hg.Password.Raw[:], gcmTagOverhead}
+func newServer(hg *conf.Hg) *Server {
+	return &Server{hg, hg.Password.Raw[:], gcmTagOverhead, newSaltPool[string]()}
 }
 
-func ListenRequests(hg *conf.Hg, targetClient transport.Client) error {
-	serverInfo := newServerInfo(hg)
-
-	addr := ":" + strconv.Itoa(serverInfo.hg.TCPPort)
-	return netutil.ListenTCPAndServe(nil, addr, func(conn net.Conn) {
-		err := handleRequest(conn, serverInfo, targetClient)
+func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Client) error {
+	server := newServer(hg)
+	addr := ":" + strconv.Itoa(server.hg.TCPPort)
+	return netutil.ListenTCPAndServe(nil, addr, func(conn *net.TCPConn) {
+		err := server.HandleConnection(ctx, conn, targetClient)
 		_ = conn.Close()
 		if err != nil {
-			log.InfoWithError("fail to handle a request over TCP", err)
+			log.InfoWithError("fail to handle a request over SS", err)
 		}
 	})
 }
 
-func handleRequest(conn net.Conn, serverInfo *serverInfo, targetClient transport.Client) error {
-	saltSize := len(serverInfo.preSharedKey)
-	reqSaltWithFixedLenHeaderEncryptedSize := saltSize + reqFixedLenHeaderSize + serverInfo.aeadOverhead
-	reqSaltWithFixedLenHeaderEncryptedBs := pool.Get(reqSaltWithFixedLenHeaderEncryptedSize)
-	defer pool.Put(reqSaltWithFixedLenHeaderEncryptedBs)
-	_, err := ioutil.ReadOnceExpectFull(conn, reqSaltWithFixedLenHeaderEncryptedBs)
+func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
+	serverConn := newServerConn(conn.(*net.TCPConn), s.preSharedKey, s.aeadOverhead, s.saltPool)
+	// this is needed to get the access address for 'targetClient'
+	err := serverConn.readClientFirstPacket()
 	if err != nil {
+		_ = conn.Close()
 		return err
 	}
-
-	repSubkey := deriveSubkey(serverInfo.preSharedKey, reqSaltWithFixedLenHeaderEncryptedBs[:saltSize])
-	respAEAD, err := aeadCipher(repSubkey)
-	if err != nil {
-		return err
-	}
-	aeadRWC := new(aeadClientConn)
-	aeadRWC.setAEADReader(respAEAD)
-
-	reqFixedLenHeaderEncryptedBs := reqSaltWithFixedLenHeaderEncryptedBs[saltSize:]
-	err = aeadRWC.decrypt(reqFixedLenHeaderEncryptedBs[:0], reqFixedLenHeaderEncryptedBs)
-	if err != nil {
-		return err
-	}
-	return nil
+	return transport.ForwardTCP(ctx, serverConn.accessAddr, serverConn, targetClient)
 }

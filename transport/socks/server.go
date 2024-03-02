@@ -82,7 +82,9 @@ func handleClientHelloRequest(ctx context.Context, conn net.Conn, authInfo *tran
 		err = ioutil.Write_(conn, helloNoAuthBytes)
 	case !authInfo.IsEmpty() && slices.Contains(methods, helloUsernamePassword):
 		err = ioutil.Write_(conn, helloUsernamePasswordBytes)
-		err = handleClientAuthenticationRequest(conn, authInfo)
+		if err == nil {
+			err = handleClientAuthenticationRequest(conn, authInfo)
+		}
 	default:
 		err = ioutil.Write_(conn, helloNoAcceptableMethodsBytes)
 		if err != nil {

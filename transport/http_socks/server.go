@@ -31,7 +31,7 @@ func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient
 	var host = httpSOCKS.Host
 	authInfo := &transport.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
 	server := &Server{authInfo}
-	connHandler := func(conn net.Conn) {
+	connHandler := func(conn *net.TCPConn) {
 		err := server.HandleConnection(ctx, conn, targetClient)
 		_ = conn.Close()
 		if err != nil {

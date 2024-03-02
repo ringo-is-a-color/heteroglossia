@@ -21,9 +21,9 @@ func SocksLikeAddrSizeInBytes(addr *transport.SocketAddress) int {
 	// https://en.wikipedia.org/wiki/SOCKS#SOCKS5
 	// Addr+Port(2)
 	// the address data that follows. Depending on type:
-	// 4 bytes for IPv4 address
-	// 1 byte of name length followed by 1–255 bytes for the domain name
-	// 16 bytes for IPv6 address
+	//   4 bytes for IPv4 address
+	//   1 byte of name length followed by 1–255 bytes for the domain name
+	//   16 bytes for IPv6 address
 	switch addr.AddrType {
 	case transport.IPv4:
 		return 1 + 4 + 2

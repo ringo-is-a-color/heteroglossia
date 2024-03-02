@@ -2,9 +2,6 @@ package ioutil
 
 import (
 	"io"
-
-	pool "github.com/libp2p/go-buffer-pool"
-	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
 type BytesReadPreloadReadWriteCloser struct {
@@ -21,13 +18,18 @@ func NewBytesReadPreloadReadWriteCloser(preloadBs []byte, rwc io.ReadWriteCloser
 }
 
 func (rwc *BytesReadPreloadReadWriteCloser) Read(p []byte) (n int, err error) {
-	if rwc.preloadBs != nil {
-		return rwc.readFirstPacketWithPreload(p)
+	if len(rwc.preloadBs) > 0 {
+		return rwc.readFirstPacketWithPreload(p, nil)
 	}
 	return rwc.ReadWriteCloser.Read(p)
 }
 
-func (rwc *BytesReadPreloadReadWriteCloser) readFirstPacketWithPreload(p []byte) (int, error) {
+func (rwc *BytesReadPreloadReadWriteCloser) readFirstPacketWithPreload(p []byte, w io.Writer) (int, error) {
+	if w != nil {
+		n, err := w.Write(rwc.preloadBs)
+		rwc.preloadBs = rwc.preloadBs[n:]
+		return n, err
+	}
 	n := copy(p, rwc.preloadBs)
 	preloadLen := len(rwc.preloadBs)
 	if n == preloadLen {
@@ -50,10 +52,7 @@ func (rwc *BytesReadPreloadReadWriteCloser) ReadFrom(r io.Reader) (n int64, err 
 func (rwc *BytesReadPreloadReadWriteCloser) WriteTo(w io.Writer) (n int64, err error) {
 	var count int
 	if rwc.preloadBs != nil {
-		buf := pool.Get(netutil.BufSize)
-		count, err = rwc.readFirstPacketWithPreload(buf)
-		count, err := w.Write(buf[:count])
-		pool.Put(buf)
+		count, err := rwc.readFirstPacketWithPreload(nil, w)
 		if err != nil {
 			return int64(count), err
 		}
