@@ -8,7 +8,7 @@ require (
 	github.com/go-playground/validator/v10 v10.18.0
 	github.com/libp2p/go-buffer-pool v0.1.0
 	github.com/mdobak/go-xerrors v0.3.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/tebeka/atexit v0.3.0
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
 	golang.org/x/crypto v0.20.0

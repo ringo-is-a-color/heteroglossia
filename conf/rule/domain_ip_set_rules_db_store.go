@@ -50,7 +50,7 @@ func NewDomainIPSetRulesQueryStore() (*DomainIPSetRulesQueryStore, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return &DomainIPSetRulesQueryStore{db: db}, nil
+	return &DomainIPSetRulesQueryStore{db}, nil
 }
 
 func (store *DomainIPSetRulesQueryStore) Close() {

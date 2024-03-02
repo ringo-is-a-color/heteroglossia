@@ -1,7 +1,6 @@
 package http_socks
 
 import (
-	"bufio"
 	"context"
 	"net"
 	"strconv"
@@ -21,17 +20,22 @@ import (
 )
 
 type Server struct {
-	AuthInfo *transport.HTTPSOCKSAuthInfo
+	http  transport.Server
+	socks transport.Server
 }
 
 var _ transport.Server = new(Server)
+
+func newServer(authInfo *transport.HTTPSOCKSAuthInfo) *Server {
+	return &Server{&http.Server{AuthInfo: authInfo}, &socks.Server{AuthInfo: authInfo}}
+}
 
 func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient transport.Client) error {
 	// can't listen to IPv4 & IPv6 together due to https://github.com/golang/go/issues/9334
 	// so also listen to IPv4 one when using '::1' or '::'
 	var host = httpSOCKS.Host
 	authInfo := &transport.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
-	server := &Server{authInfo}
+	server := newServer(authInfo)
 	connHandler := func(conn *net.TCPConn) {
 		err := server.HandleConnection(ctx, conn, targetClient)
 		_ = conn.Close()
@@ -91,13 +95,11 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 		return errors.New("SOCKS4 protocol is not supported, only SOCKS5 is supported")
 	case socks.Sock5Version:
 		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "SOCKS5 Proxy")
-		return (&socks.Server{AuthInfo: s.AuthInfo}).HandleConnection(ctx, conn, targetClient)
+		return s.socks.HandleConnection(ctx, conn, targetClient)
 	default:
 		// assume this is an HTTP proxy request
 		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "HTTP Proxy")
-		// 256 is a micro optimization here to reduce the buffer size
-		bufReader := bufio.NewReaderSize(ioutil.NewBytesReadPreloadReadWriteCloser([]byte{b}, conn), 256)
-		return (&http.Server{ConnBufReader: bufReader, AuthInfo: s.AuthInfo}).HandleConnection(ctx, conn, targetClient)
+		return s.http.HandleConnection(ctx, ioutil.NewBytesReadPreloadConn([]byte{b}, conn), targetClient)
 	}
 }
 

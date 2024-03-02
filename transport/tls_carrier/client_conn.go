@@ -9,7 +9,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/transport/socks"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
-	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
+	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 )
 
 type clientConn struct {
@@ -67,7 +67,7 @@ func (c *clientConn) ReadFrom(r io.Reader) (n int64, err error) {
 	var count int
 	if !c.hasWriteFirstPacket {
 		c.hasWriteFirstPacket = true
-		firstPacketBs := pool.Get(netutil.BufSize)
+		firstPacketBs := pool.Get(ioutil.BufSize)
 
 		for {
 			count, err = r.Read(firstPacketBs)

@@ -1,12 +1,12 @@
 package http
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"net"
 	"net/http"
 
+	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
@@ -14,8 +14,7 @@ import (
 )
 
 type Server struct {
-	ConnBufReader *bufio.Reader
-	AuthInfo      *transport.HTTPSOCKSAuthInfo
+	AuthInfo *transport.HTTPSOCKSAuthInfo
 }
 
 var _ transport.Server = new(Server)
@@ -33,7 +32,10 @@ var connectSuccessBytes = []byte("HTTP/1.1 200 OK\r\n\r\n")
 // always consider connection persistent and take little care of HTTP connection header to make the impl simper
 
 func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
-	req, err := readRequest(s.ConnBufReader)
+	buf := pool.Get(ioutil.BufSize)
+	defer pool.Put(buf)
+	connBufReader := ioutil.NewBufioReader(buf, conn)
+	req, err := readRequest(connBufReader)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -66,22 +68,30 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 		if err != nil {
 			return err
 		}
-		return transport.ForwardTCP(ctx, addr, conn, targetClient)
+		unreadSize := connBufReader.Buffered()
+		unreadBs, err := connBufReader.Peek(unreadSize)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		return transport.ForwardTCP(ctx, addr, ioutil.NewBytesReadPreloadConn(unreadBs, conn), targetClient)
 	}
 
 	lp, rp := net.Pipe()
 	go func() {
-		lprb := bufio.NewReader(lp)
+		buf := pool.Get(ioutil.BufSize)
+		defer pool.Put(buf)
+		lprb := ioutil.NewBufioReader(buf, lp)
 		var rerr, werr error
+		var resp *http.Response
 		for {
 			removeHopByHopHeaders(req.Header)
 
-			werr := req.Write(lp)
+			werr = req.Write(lp)
 			if werr != nil {
 				werr = errors.WithStack(werr)
 				break
 			}
-			resp, rerr := http.ReadResponse(lprb, req)
+			resp, rerr = http.ReadResponse(lprb, req)
 			if rerr != nil {
 				rerr = errors.WithStack(rerr)
 				break
@@ -99,7 +109,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 			if req.Close || resp.Close {
 				break
 			}
-			req, werr = readRequest(s.ConnBufReader)
+			req, werr = readRequest(connBufReader)
 			if werr != nil {
 				if !errors.IsIoEof(werr) {
 					werr = errors.WithStack(werr)

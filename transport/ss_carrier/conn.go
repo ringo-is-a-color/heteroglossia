@@ -477,32 +477,30 @@ func (c *conn) validateFixedHeaderAndReturnLen(fixedLenHeaderBs []byte) (int, er
 }
 
 func (c *conn) ReadFrom(r io.Reader) (n int64, err error) {
+	payloadStart := lenFieldSize + c.aeadOverhead
+	maxPayloadReadSize := payloadStart + maxChunkSize + c.aeadOverhead
+	maxPayloadReadBs := pool.Get(maxPayloadReadSize)
+	defer pool.Put(maxPayloadReadBs)
+
 	if !c.hasWriteFirstPacket {
 		c.hasWriteFirstPacket = true
-		firstReqPayloadBs := pool.Get(maxChunkSize)
-		count, err := r.Read(firstReqPayloadBs)
+		count, err := r.Read(maxPayloadReadBs)
 		n += int64(count)
 		if err != nil && !errors.IsIoEof(err) {
-			pool.Put(firstReqPayloadBs)
 			return n, err
 		}
 		if c.isClient {
-			_, err = c.writeClientFirstPacket(firstReqPayloadBs[:count])
+			_, err = c.writeClientFirstPacket(maxPayloadReadBs[:count])
 		} else {
-			_, err = c.writeServerFirstPacket(firstReqPayloadBs[:count])
+			_, err = c.writeServerFirstPacket(maxPayloadReadBs[:count])
 		}
-		pool.Put(firstReqPayloadBs)
 		if err != nil {
 			return n, err
 		}
 	}
 
-	payloadStart := lenFieldSize + c.aeadOverhead
-	payloadEncryptedSize := payloadStart + maxChunkSize + c.aeadOverhead
-	payloadEncryptedBs := pool.Get(payloadEncryptedSize)
-	defer pool.Put(payloadEncryptedBs)
 	for {
-		count, err := r.Read(payloadEncryptedBs[payloadStart : payloadStart+maxChunkSize])
+		count, err := r.Read(maxPayloadReadBs[payloadStart : payloadStart+maxChunkSize])
 		n += int64(count)
 		if err != nil {
 			if errors.IsIoEof(err) {
@@ -510,11 +508,11 @@ func (c *conn) ReadFrom(r io.Reader) (n int64, err error) {
 			}
 			return n, errors.WithStack(err)
 		}
-		binary.BigEndian.PutUint16(payloadEncryptedBs, uint16(count))
-		c.encryptInPlace(payloadEncryptedBs[:lenFieldSize])
-		c.encryptInPlace(payloadEncryptedBs[payloadStart : payloadStart+count])
+		binary.BigEndian.PutUint16(maxPayloadReadBs, uint16(count))
+		c.encryptInPlace(maxPayloadReadBs[:lenFieldSize])
+		c.encryptInPlace(maxPayloadReadBs[payloadStart : payloadStart+count])
 
-		_, err = c.TCPConn.Write(payloadEncryptedBs[:payloadStart+count+c.aeadOverhead])
+		_, err = c.TCPConn.Write(maxPayloadReadBs[:payloadStart+count+c.aeadOverhead])
 		if err != nil {
 			return n, err
 		}

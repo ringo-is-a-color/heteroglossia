@@ -8,6 +8,8 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 )
 
+const BufSize = 4096
+
 // includes file's abs path when an error occurs
 
 func ReadFile(filePath string) ([]byte, error) {

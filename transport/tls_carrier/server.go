@@ -1,15 +1,12 @@
 package tls_carrier
 
 import (
-	"bufio"
 	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
 	"net/netip"
-	"net/textproto"
 	"strconv"
-	"sync"
 
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/ringo-is-a-color/heteroglossia/conf"
@@ -87,10 +84,9 @@ func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Cli
 }
 
 func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
-	// the tls_carrier protocol use 18 bytes for password(16) + CRLF(2)
-	// the trojan protocol use 58 bytes for password(56) + CRLF(2)
-	// so using 128 here for password + address
-	bufReader := bufio.NewReaderSize(conn, 128)
+	buf := pool.Get(ioutil.BufSize)
+	defer pool.Put(buf)
+	bufReader := ioutil.NewBufioReader(buf, conn)
 	textProtoReader := newTextprotoReader(bufReader)
 
 	// read one line to make our server like a normal HTTP server
@@ -119,7 +115,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 			ip := netip.IPv6Loopback()
 			ctx := contextutil.WithValues(ctx, contextutil.InboundTag, "TLS carrier with wrong auth")
 			fallbackAddr := transport.NewSocketAddressByIP(&ip, s.tlsBadAuthFallbackServerPort)
-			return transport.ForwardTCP(ctx, fallbackAddr, ioutil.NewBytesReadPreloadReadWriteCloser(unrelatedBs, conn), targetClient)
+			return transport.ForwardTCP(ctx, fallbackAddr, ioutil.NewBytesReadPreloadConn(unrelatedBs, conn), targetClient)
 		} else {
 			isTrojan = true
 		}
@@ -141,26 +137,10 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 		}
 	}
 
-	bufSize := bufReader.Buffered()
-	unreadBs, err := bufReader.Peek(bufSize)
+	unreadSize := bufReader.Buffered()
+	unreadBs, err := bufReader.Peek(unreadSize)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	return transport.ForwardTCP(ctx, accessAddr, ioutil.NewBytesReadPreloadReadWriteCloser(unreadBs, conn), targetClient)
-}
-
-var textprotoReaderPool sync.Pool
-
-func newTextprotoReader(br *bufio.Reader) *textproto.Reader {
-	if v := textprotoReaderPool.Get(); v != nil {
-		tr := v.(*textproto.Reader)
-		tr.R = br
-		return tr
-	}
-	return textproto.NewReader(br)
-}
-
-func putTextprotoReader(r *textproto.Reader) {
-	r.R = nil
-	textprotoReaderPool.Put(r)
+	return transport.ForwardTCP(ctx, accessAddr, ioutil.NewBytesReadPreloadConn(unreadBs, conn), targetClient)
 }
