@@ -11,6 +11,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/transport/http"
 	"github.com/ringo-is-a-color/heteroglossia/transport/socks"
+	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
@@ -89,11 +90,11 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 	case socks.Sock4Version:
 		return errors.New("SOCKS4 protocol is not supported, only SOCKS5 is supported")
 	case socks.Sock5Version:
-		log.Debug("request", "source", conn.RemoteAddr().String(), "type", "SOCKS5 Proxy")
+		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "SOCKS5 Proxy")
 		return (&socks.Server{AuthInfo: s.AuthInfo}).HandleConnection(ctx, conn, targetClient)
 	default:
 		// assume this is an HTTP proxy request
-		log.Debug("request", "source", conn.RemoteAddr().String(), "type", "HTTP Proxy")
+		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "HTTP Proxy")
 		// 256 is a micro optimization here to reduce the buffer size
 		bufReader := bufio.NewReaderSize(ioutil.NewBytesReadPreloadReadWriteCloser([]byte{b}, conn), 256)
 		return (&http.Server{ConnBufReader: bufReader, AuthInfo: s.AuthInfo}).HandleConnection(ctx, conn, targetClient)

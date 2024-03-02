@@ -11,6 +11,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport/direct"
 	"github.com/ringo-is-a-color/heteroglossia/transport/reject"
 	"github.com/ringo-is-a-color/heteroglossia/transport/tls_carrier"
+	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/updater"
@@ -80,7 +81,8 @@ func (c *Client) Dial(ctx context.Context, network string, addr *transport.Socke
 			return nil, err
 		}
 	}
-	log.Info("route", "access", addr.ToHostStr(), "policy", policy)
+	log.Info("route", contextutil.SourceTag, ctx.Value(contextutil.SourceTag),
+		contextutil.InboundTag, ctx.Value(contextutil.InboundTag), "access", addr.ToHostStr(), "policy", policy)
 	return nextClient.Dial(ctx, network, addr)
 }
 

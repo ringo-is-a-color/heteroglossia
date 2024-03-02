@@ -15,6 +15,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/transport/socks"
+	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
@@ -76,6 +77,7 @@ func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Cli
 
 	addr := ":" + strconv.Itoa(server.hg.TLSPort)
 	return netutil.ListenTLSAndAccept(ctx, addr, server.tlsConfig, func(conn net.Conn) {
+		ctx := contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "TLS carrier")
 		err := server.HandleConnection(ctx, conn, targetClient)
 		_ = conn.Close()
 		if err != nil {
@@ -85,7 +87,6 @@ func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Cli
 }
 
 func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
-	log.Debug("request", "source", conn.RemoteAddr().String(), "type", "TLS carrier")
 	// the tls_carrier protocol use 18 bytes for password(16) + CRLF(2)
 	// the trojan protocol use 58 bytes for password(56) + CRLF(2)
 	// so using 128 here for password + address
@@ -116,6 +117,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 			unrelatedBs = append(unrelatedBs, CRLF...)
 			unrelatedBs = append(unrelatedBs, unreadBs...)
 			ip := netip.IPv6Loopback()
+			ctx := contextutil.WithValues(ctx, contextutil.InboundTag, "TLS carrier with wrong auth")
 			fallbackAddr := transport.NewSocketAddressByIP(&ip, s.tlsBadAuthFallbackServerPort)
 			return transport.ForwardTCP(ctx, fallbackAddr, ioutil.NewBytesReadPreloadReadWriteCloser(unrelatedBs, conn), targetClient)
 		} else {
