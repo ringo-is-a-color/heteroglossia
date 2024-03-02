@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	pool "github.com/libp2p/go-buffer-pool"
+	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
@@ -14,7 +15,7 @@ import (
 )
 
 type Server struct {
-	AuthInfo *transport.HTTPSOCKSAuthInfo
+	AuthInfo *conf.HTTPSOCKSAuthInfo
 }
 
 var _ transport.Server = new(Server)

@@ -1,4 +1,4 @@
-package transport
+package conf
 
 type HTTPSOCKSAuthInfo struct {
 	Username string

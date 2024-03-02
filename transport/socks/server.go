@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
@@ -12,7 +13,7 @@ import (
 )
 
 type Server struct {
-	AuthInfo *transport.HTTPSOCKSAuthInfo
+	AuthInfo *conf.HTTPSOCKSAuthInfo
 }
 
 var _ transport.Server = new(Server)
@@ -68,7 +69,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 	return handleClientHelloRequest(ctx, conn, s.AuthInfo, targetClient)
 }
 
-func handleClientHelloRequest(ctx context.Context, conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo,
+func handleClientHelloRequest(ctx context.Context, conn net.Conn, authInfo *conf.HTTPSOCKSAuthInfo,
 	targetClient transport.Client) error {
 	// the version byte of the SOCKS5 protocol is already checked in the http_socks package
 	// so we start to check the 'methods' directly
@@ -121,7 +122,7 @@ Response
 var authUsernamePasswordSuccessBytes = []byte{authUsernamePasswordVersion, authUsernamePasswordSuccess}
 var authUsernamePasswordFailureBytes = []byte{authUsernamePasswordVersion, authUsernamePasswordFailure}
 
-func handleClientAuthenticationRequest(conn net.Conn, authInfo *transport.HTTPSOCKSAuthInfo) error {
+func handleClientAuthenticationRequest(conn net.Conn, authInfo *conf.HTTPSOCKSAuthInfo) error {
 	authInfoFromRequest, err := readClientAuthUsernamePassword(conn)
 	if err != nil {
 		return err
@@ -133,7 +134,7 @@ func handleClientAuthenticationRequest(conn net.Conn, authInfo *transport.HTTPSO
 	return ioutil.Write_(conn, authUsernamePasswordSuccessBytes)
 }
 
-func readClientAuthUsernamePassword(r io.Reader) (authInfo *transport.HTTPSOCKSAuthInfo, err error) {
+func readClientAuthUsernamePassword(r io.Reader) (authInfo *conf.HTTPSOCKSAuthInfo, err error) {
 	version, err := ioutil.Read1(r)
 	if err != nil {
 		return
@@ -143,7 +144,7 @@ func readClientAuthUsernamePassword(r io.Reader) (authInfo *transport.HTTPSOCKSA
 		return
 	}
 
-	authInfo = &transport.HTTPSOCKSAuthInfo{}
+	authInfo = &conf.HTTPSOCKSAuthInfo{}
 	authInfo.Username, err = ioutil.ReadStringByUint8(r)
 	if err != nil {
 		return

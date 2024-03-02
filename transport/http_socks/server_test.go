@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ringo-is-a-color/heteroglossia/transport"
+	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport/direct"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,8 +25,8 @@ var (
 	accessURL           string
 	accessAddrs         = []string{"127.0.0.1", "[::ffff:127.0.0.1]", "[::1]", "localhost"}
 
-	authInfo      = &transport.HTTPSOCKSAuthInfo{Username: "username", Password: "password"}
-	wrongAuthInfo = &transport.HTTPSOCKSAuthInfo{Username: "username", Password: "password1"}
+	authInfo      = &conf.HTTPSOCKSAuthInfo{Username: "username", Password: "password"}
+	wrongAuthInfo = &conf.HTTPSOCKSAuthInfo{Username: "username", Password: "password1"}
 )
 
 func init() {
@@ -68,7 +68,7 @@ func testHandleConnectionWithoutAuthInfo(t *testing.T) {
 
 func testHandleConnectionWithEmptyAuthInfo(t *testing.T) {
 	err1, err2 := parRun(func() error {
-		return startProxyServer(t, &transport.HTTPSOCKSAuthInfo{})
+		return startProxyServer(t, &conf.HTTPSOCKSAuthInfo{})
 	}, func() error {
 		return startClient(nil)
 	})
@@ -99,7 +99,7 @@ func testHandleConnectionWithIncorrectAuthInfo(t *testing.T) {
 	assert.NotNil(t, err2)
 }
 
-func startProxyServer(t *testing.T, authInfo *transport.HTTPSOCKSAuthInfo) error {
+func startProxyServer(t *testing.T, authInfo *conf.HTTPSOCKSAuthInfo) error {
 	ln, err := net.Listen("tcp", proxyServerAddr)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func startProxyServer(t *testing.T, authInfo *transport.HTTPSOCKSAuthInfo) error
 	return newServer(authInfo).HandleConnection(context.Background(), rwc, &direct.Client{})
 }
 
-func startClient(authInfo *transport.HTTPSOCKSAuthInfo) error {
+func startClient(authInfo *conf.HTTPSOCKSAuthInfo) error {
 	var proxyUser string
 	if authInfo.IsEmpty() {
 		proxyUser = ""

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/ringo-is-a-color/heteroglossia/transport"
+	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/util/cmd"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
@@ -12,7 +12,7 @@ import (
 
 // not work when macOS's 'System Settings -> VPN' is enabled
 
-func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) (unsetProxy func(), err error) {
+func SetSystemProxy(host string, port uint16, authInfo *conf.HTTPSOCKSAuthInfo) (unsetProxy func(), err error) {
 	serviceName, err := currentNetworkServiceName()
 	if err != nil {
 		return nil, err

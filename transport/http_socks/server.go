@@ -26,7 +26,7 @@ type Server struct {
 
 var _ transport.Server = new(Server)
 
-func newServer(authInfo *transport.HTTPSOCKSAuthInfo) *Server {
+func newServer(authInfo *conf.HTTPSOCKSAuthInfo) *Server {
 	return &Server{&http.Server{AuthInfo: authInfo}, &socks.Server{AuthInfo: authInfo}}
 }
 
@@ -34,7 +34,7 @@ func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient
 	// can't listen to IPv4 & IPv6 together due to https://github.com/golang/go/issues/9334
 	// so also listen to IPv4 one when using '::1' or '::'
 	var host = httpSOCKS.Host
-	authInfo := &transport.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
+	authInfo := &conf.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
 	server := newServer(authInfo)
 	connHandler := func(conn *net.TCPConn) {
 		err := server.HandleConnection(ctx, conn, targetClient)

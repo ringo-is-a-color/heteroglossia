@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ringo-is-a-color/heteroglossia/transport"
+	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/util/cmd"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 )
 
-func SetSystemProxy(host string, port uint16, authInfo *transport.HTTPSOCKSAuthInfo) (unsetProxy func(), err error) {
+func SetSystemProxy(host string, port uint16, authInfo *conf.HTTPSOCKSAuthInfo) (unsetProxy func(), err error) {
 	// https://developer-old.gnome.org/ProxyConfiguration/
 	// org.gnome.system.proxy use-same-proxy and org.gnome.system.proxy.http enabled are not used so don't use them
 	gnomeProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`gsettings set org.gnome.system.proxy mode 'manual' && 
