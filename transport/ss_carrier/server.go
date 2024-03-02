@@ -28,7 +28,7 @@ func newServer(hg *conf.Hg) *Server {
 func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Client) error {
 	server := newServer(hg)
 	addr := ":" + strconv.Itoa(server.hg.TCPPort)
-	return netutil.ListenTCPAndServe(nil, addr, func(conn *net.TCPConn) {
+	return netutil.ListenTCPAndServe(ctx, addr, func(conn *net.TCPConn) {
 		err := server.HandleConnection(ctx, conn, targetClient)
 		_ = conn.Close()
 		if err != nil {

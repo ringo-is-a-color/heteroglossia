@@ -17,12 +17,14 @@ func TestClientServerConnection(t *testing.T, newClient func(serverConf *conf.Co
 	listenRequest func(ctx context.Context, hg *conf.Hg, targetClient transport.Client) error) {
 	serverConf, err := conf.Parse("server_example.conf.json")
 	assert.Nil(t, err)
-	if serverConf.Inbounds.Hg != nil {
-		go func() {
-			err := listenRequest(context.Background(), serverConf.Inbounds.Hg, new(direct.Client))
-			assert.Nil(t, err)
-		}()
-	}
+	assert.NotNil(t, serverConf.Inbounds.Hg)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		err := listenRequest(ctx, serverConf.Inbounds.Hg, new(direct.Client))
+		assert.Nil(t, err)
+	}()
+
 	client, err := newClient(serverConf)
 	assert.Nil(t, err)
 	server := startWebServer()

@@ -250,7 +250,7 @@ func (c *conn) ReadOrWriteTo(b []byte, w io.Writer) (n int, err error) {
 	if len(c.readerBuf) != 0 {
 		if w != nil {
 			n, err := w.Write(c.readerBuf)
-			c.readerBuf = c.readerBuf[:n]
+			c.readerBuf = c.readerBuf[n:]
 			return n, err
 		}
 		n = copy(b, c.readerBuf)

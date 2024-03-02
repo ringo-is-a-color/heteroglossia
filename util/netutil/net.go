@@ -31,10 +31,18 @@ func DialTCP(ctx context.Context, addr string) (*net.TCPConn, error) {
 
 func ListenTCPAndAccept(ctx context.Context, addr string,
 	listenHandler func(ln net.Listener) error, listenFinishedCallback func()) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	ln, err := listenConfig.Listen(ctx, "tcp", addr)
 	if err != nil {
 		return errors.WithStack(err)
 	}
+	go func() {
+		// https://github.com/golang/go/issues/28120
+		<-ctx.Done()
+		_ = ln.Close()
+	}()
+
 	addListener(ln)
 	defer func() {
 		removeListener(ln)
@@ -42,7 +50,11 @@ func ListenTCPAndAccept(ctx context.Context, addr string,
 			listenFinishedCallback()
 		}
 	}()
-	return listenHandler(ln)
+	err = listenHandler(ln)
+	if errors.Is(err, net.ErrClosed) {
+		return nil
+	}
+	return err
 }
 
 func ListenTCPAndServe(ctx context.Context, addr string, connHandler func(tcpConn *net.TCPConn)) error {
@@ -94,9 +106,6 @@ func accept(ln net.Listener, f func(conn net.Conn)) error {
 		conn, err := ln.Accept()
 		if err != nil {
 			return errors.WithStack(err)
-		}
-		if err != nil {
-			return err
 		}
 		go f(conn)
 	}
