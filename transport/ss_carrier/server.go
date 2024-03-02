@@ -21,6 +21,8 @@ type Server struct {
 	saltPool *saltPool[string]
 }
 
+var _ transport.Server = new(Server)
+
 func newServer(hg *conf.Hg) *Server {
 	return &Server{hg, hg.Password.Raw[:], gcmTagOverhead, newSaltPool[string]()}
 }

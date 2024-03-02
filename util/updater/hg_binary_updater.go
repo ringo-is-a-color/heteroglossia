@@ -62,7 +62,7 @@ func latestTagVersion(client *http.Client) (string, error) {
 	}
 
 	decoder := json.NewDecoder(resp.Body)
-	latest := new(Latest)
+	latest := new(latest)
 	err = decoder.Decode(latest)
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -73,7 +73,7 @@ func latestTagVersion(client *http.Client) (string, error) {
 	return latest.TagName, nil
 }
 
-type Latest struct {
+type latest struct {
 	TagName string `json:"tag_name"`
 }
 

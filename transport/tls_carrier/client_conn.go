@@ -54,7 +54,7 @@ func (c *clientConn) writeClientFirstPacket(payload []byte) (int, error) {
 
 	buf := bytes.NewBuffer(firstPacketBs[:0])
 	buf.Write(c.passwordWithCRLF[:])
-	buf.Write(CRLF)
+	buf.Write(crlf)
 	writeSocksLikeConnectionCommandRequest(buf, c.accessAddr)
 	buf.Write(payload)
 

@@ -27,12 +27,12 @@ const (
 	ipSetTagPrefix     = "ip-set-tag/"
 )
 
-func NewMatcher(matchRules []string) *Matcher {
+func newMatcher(matchRules []string) *Matcher {
 	return &Matcher{domainFullAndSuffixMatcher: newDomainFullAndSuffixMatcher(), bakedMatchRules: matchRules}
 }
 
 func (matcher *Matcher) CopyWithBakedRulesOnly() *Matcher {
-	return NewMatcher(matcher.bakedMatchRules)
+	return newMatcher(matcher.bakedMatchRules)
 }
 
 func (matcher *Matcher) SetupRulesData(rulesQueryStore *DomainIPSetRulesQueryStore) error {
@@ -129,7 +129,7 @@ func (matcher *Matcher) UnmarshalJSON(data []byte) error {
 		return errors.New(err, "fail to parse 'match' rules")
 	}
 
-	createdMatcher := NewMatcher(matchRules)
+	createdMatcher := newMatcher(matchRules)
 	*matcher = *createdMatcher
 	return nil
 }

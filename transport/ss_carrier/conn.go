@@ -238,10 +238,10 @@ func (c *conn) writeServerFirstPacket(payload []byte) (int, error) {
 }
 
 func (c *conn) Read(b []byte) (n int, err error) {
-	return c.ReadOrWriteTo(b, nil)
+	return c.readOrWriteTo(b, nil)
 }
 
-func (c *conn) ReadOrWriteTo(b []byte, w io.Writer) (n int, err error) {
+func (c *conn) readOrWriteTo(b []byte, w io.Writer) (n int, err error) {
 	if c.isClient && !c.hasReadFirstPacket {
 		c.hasReadFirstPacket = true
 		return c.readServerFirstPacket(b, w)
@@ -521,7 +521,7 @@ func (c *conn) ReadFrom(r io.Reader) (n int64, err error) {
 
 func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
 	for {
-		count, err := c.ReadOrWriteTo(nil, w)
+		count, err := c.readOrWriteTo(nil, w)
 		n += int64(count)
 		if err != nil {
 			if errors.IsIoEof(err) {

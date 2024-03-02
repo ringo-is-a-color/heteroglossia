@@ -6,10 +6,10 @@ import (
 	_ "unsafe"
 )
 
-var CRLF = []byte{'\r', '\n'}
+var crlf = []byte{'\r', '\n'}
 
 //go:linkname newTextprotoReader net/http.newTextprotoReader
-func newTextprotoReader(br *bufio.Reader) *textproto.Reader
+func newTextprotoReader(_ *bufio.Reader) *textproto.Reader
 
 //go:linkname putTextprotoReader net/http.putTextprotoReader
-func putTextprotoReader(r *textproto.Reader)
+func putTextprotoReader(_ *textproto.Reader)

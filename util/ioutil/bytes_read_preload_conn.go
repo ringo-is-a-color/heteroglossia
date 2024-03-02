@@ -5,30 +5,30 @@ import (
 	"net"
 )
 
-type BytesReadPreloadConn struct {
+type bytesReadPreloadConn struct {
 	preloadBs []byte
 	net.Conn
 }
 
-var _ net.Conn = new(BytesReadPreloadConn)
-var _ io.ReaderFrom = new(BytesReadPreloadConn)
-var _ io.WriterTo = new(BytesReadPreloadConn)
+var _ net.Conn = new(bytesReadPreloadConn)
+var _ io.ReaderFrom = new(bytesReadPreloadConn)
+var _ io.WriterTo = new(bytesReadPreloadConn)
 
 func NewBytesReadPreloadConn(preloadBs []byte, conn net.Conn) net.Conn {
 	if len(preloadBs) > 0 {
-		return &BytesReadPreloadConn{preloadBs, conn}
+		return &bytesReadPreloadConn{preloadBs, conn}
 	}
 	return conn
 }
 
-func (c *BytesReadPreloadConn) Read(p []byte) (n int, err error) {
+func (c *bytesReadPreloadConn) Read(p []byte) (n int, err error) {
 	if len(c.preloadBs) > 0 {
 		return c.readFirstPacketWithPreload(p, nil)
 	}
 	return c.Conn.Read(p)
 }
 
-func (c *BytesReadPreloadConn) readFirstPacketWithPreload(p []byte, w io.Writer) (int, error) {
+func (c *bytesReadPreloadConn) readFirstPacketWithPreload(p []byte, w io.Writer) (int, error) {
 	if w != nil {
 		n, err := w.Write(c.preloadBs)
 		c.preloadBs = c.preloadBs[n:]
@@ -49,11 +49,11 @@ func (c *BytesReadPreloadConn) readFirstPacketWithPreload(p []byte, w io.Writer)
 	return n, nil
 }
 
-func (c *BytesReadPreloadConn) ReadFrom(r io.Reader) (n int64, err error) {
+func (c *bytesReadPreloadConn) ReadFrom(r io.Reader) (n int64, err error) {
 	return io.Copy(c.Conn, r)
 }
 
-func (c *BytesReadPreloadConn) WriteTo(w io.Writer) (n int64, err error) {
+func (c *bytesReadPreloadConn) WriteTo(w io.Writer) (n int64, err error) {
 	var count int
 	if c.preloadBs != nil {
 		count, err := c.readFirstPacketWithPreload(nil, w)

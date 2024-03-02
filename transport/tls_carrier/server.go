@@ -110,7 +110,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 			// 2 = len(CRLF)
 			unrelatedBs := pool.Get(len(lineBs) + 2 + len(unreadBs))[:0]
 			defer pool.Put(unrelatedBs)
-			unrelatedBs = append(unrelatedBs, CRLF...)
+			unrelatedBs = append(unrelatedBs, crlf...)
 			unrelatedBs = append(unrelatedBs, unreadBs...)
 			ip := netip.IPv6Loopback()
 			ctx := contextutil.WithValues(ctx, contextutil.InboundTag, "TLS carrier with wrong auth")

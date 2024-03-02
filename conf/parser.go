@@ -39,7 +39,7 @@ func Parse(configFilePath string) (*Config, error) {
 		return nil, errors.Newf(err, "error: %v", configFilePath)
 	}
 
-	err = config.Route.Rules.SetupRulesData()
+	err = config.Route.Rules.setupRulesData()
 	if err != nil {
 		return nil, err
 	}

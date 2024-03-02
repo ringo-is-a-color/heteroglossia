@@ -7,7 +7,7 @@ import (
 )
 
 //go:linkname reset bufio.(*Reader).reset
-func reset(b *bufio.Reader, buf []byte, r io.Reader)
+func reset(_ *bufio.Reader, _ []byte, _ io.Reader)
 
 func NewBufioReader(bs []byte, r io.Reader) *bufio.Reader {
 	buf := new(bufio.Reader)

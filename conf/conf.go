@@ -79,7 +79,7 @@ type TLSCertKeyPair struct {
 	KeyFile  string
 }
 
-func (rules Rules) SetupRulesData() error {
+func (rules Rules) setupRulesData() error {
 	store, err := libRule.NewDomainIPSetRulesQueryStore()
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (rules Rules) CopyWithNewRulesData() (Rules, error) {
 		newRules = append(newRules, newRule)
 	}
 
-	err := Rules(newRules).SetupRulesData()
+	err := Rules(newRules).setupRulesData()
 	if err != nil {
 		return nil, err
 	}
