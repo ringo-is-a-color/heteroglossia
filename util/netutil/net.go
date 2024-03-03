@@ -31,6 +31,7 @@ func DialTCP(ctx context.Context, addr string) (*net.TCPConn, error) {
 
 func ListenTCPAndAccept(ctx context.Context, addr string,
 	listenHandler func(ln net.Listener) error, listenFinishedCallback func()) error {
+	// use 'context.WithCancel' to avoid memory leak in below goroutine
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	ln, err := listenConfig.Listen(ctx, "tcp", addr)
