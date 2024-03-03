@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/textproto"
 	"strconv"
 
 	pool "github.com/libp2p/go-buffer-pool"
@@ -87,14 +88,13 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 	buf := pool.Get(ioutil.BufSize)
 	defer pool.Put(buf)
 	bufReader := ioutil.NewBufioReader(buf, conn)
-	textProtoReader := newTextprotoReader(bufReader)
+	textProtoReader := textproto.NewReader(bufReader)
 
 	// read one line to make our server like a normal HTTP server
 	// for a TLS carrier client, it uses a password without CRLF
 	// for a Trojan client, it uses a hex string password which doesn't include CRLF bytes
 	// so we can always load a line with a password in both cases
 	lineBs, err := textProtoReader.ReadLineBytes()
-	putTextprotoReader(textProtoReader)
 	if err != nil {
 		return errors.WithStack(err)
 	}
