@@ -44,7 +44,6 @@ func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 	// this is needed to get the access address for 'targetClient'
 	err := serverConn.readClientFirstPacket()
 	if err != nil {
-		_ = conn.Close()
 		return err
 	}
 	return transport.ForwardTCP(ctx, serverConn.accessAddr, serverConn, s.targetClient)
