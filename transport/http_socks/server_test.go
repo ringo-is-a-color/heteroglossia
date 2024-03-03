@@ -113,7 +113,14 @@ func startProxyServer(t *testing.T, authInfo *conf.HTTPSOCKSAuthInfo) error {
 	if err != nil {
 		return err
 	}
-	return newServer(authInfo).HandleConnection(context.Background(), rwc, &direct.Client{})
+
+	var httpSOCKS *conf.HTTPSOCKS
+	if authInfo == nil {
+		httpSOCKS = &conf.HTTPSOCKS{}
+	} else {
+		httpSOCKS = &conf.HTTPSOCKS{Username: authInfo.Username, Password: authInfo.Password}
+	}
+	return NewServer(httpSOCKS, direct.NewClient()).Serve(context.Background(), rwc)
 }
 
 func startClient(authInfo *conf.HTTPSOCKSAuthInfo) error {

@@ -20,41 +20,43 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
-type Server struct {
-	hg                           *conf.Hg
+type server struct {
+	hg           *conf.Hg
+	targetClient transport.Client
+
+	passwordWithCRLF [16]byte
+	trojanPassword   [56]byte
+
 	tlsConfig                    *tls.Config
-	passwordWithCRLF             [16]byte
-	trojanPassword               [56]byte
 	tlsBadAuthFallbackServerPort uint16
-	tlsBadAuthFallbackSiteDir    string
 }
 
-var _ transport.Server = new(Server)
+var _ transport.Server = new(server)
 
-func newServer(ctx context.Context, hg *conf.Hg) (*Server, error) {
-	server := &Server{hg: hg}
-	if hg.TLSCertKeyPair == nil {
-		tlsConfig, err := tlsConfigWithAutomatedCertificate(ctx, hg.Host)
-		if err != nil {
-			return nil, err
-		}
-		server.tlsConfig = tlsConfig
-	} else {
-		cert, err := tls.LoadX509KeyPair(hg.TLSCertKeyPair.CertFile, hg.TLSCertKeyPair.KeyFile)
-		if err != nil {
-			return nil, errors.New(err, "fail to load TLS Certificate/Key pair files")
-		}
-		server.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
-	}
+func NewServer(hg *conf.Hg, targetClient transport.Client) transport.Server {
+	server := &server{hg: hg, targetClient: targetClient}
 	server.passwordWithCRLF = replaceCRLF(hg.Password.Raw)
 	server.trojanPassword = toTrojanPassword(hg.Password.String)
+	return server
+}
+
+func (s *server) ListenAndServe(ctx context.Context) error {
+	if s.hg.TLSCertKeyPair == nil {
+		s.tlsConfig = tlsConfigWithAutomatedCertificate(ctx, s.hg.Host)
+	} else {
+		cert, err := tls.LoadX509KeyPair(s.hg.TLSCertKeyPair.CertFile, s.hg.TLSCertKeyPair.KeyFile)
+		if err != nil {
+			return errors.New(err, "fail to load TLS Certificate/Key pair files")
+		}
+		s.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+	}
 
 	port := make(chan uint16, 1)
 	go func() {
 		err := netutil.ListenTCPAndAccept(ctx, ":0", func(ln net.Listener) error {
 			var handler http.Handler = nil
-			if hg.TLSBadAuthFallbackSiteDir != "" {
-				handler = http.FileServer(http.Dir(hg.TLSBadAuthFallbackSiteDir))
+			if s.hg.TLSBadAuthFallbackSiteDir != "" {
+				handler = http.FileServer(http.Dir(s.hg.TLSBadAuthFallbackSiteDir))
 			}
 			port <- uint16(ln.Addr().(*net.TCPAddr).Port)
 			return errors.WithStack(http.Serve(ln, handler))
@@ -63,20 +65,12 @@ func newServer(ctx context.Context, hg *conf.Hg) (*Server, error) {
 			log.Fatal("fail to serve a fallback server", err)
 		}
 	}()
-	server.tlsBadAuthFallbackServerPort = <-port
-	return server, nil
-}
+	s.tlsBadAuthFallbackServerPort = <-port
 
-func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Client) error {
-	server, err := newServer(ctx, hg)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	addr := ":" + strconv.Itoa(server.hg.TLSPort)
-	return netutil.ListenTLSAndAccept(ctx, addr, server.tlsConfig, func(conn net.Conn) {
-		ctx := contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "TLS carrier")
-		err := server.HandleConnection(ctx, conn, targetClient)
+	addr := ":" + strconv.Itoa(s.hg.TLSPort)
+	return netutil.ListenTLSAndAccept(ctx, addr, s.tlsConfig, func(conn net.Conn) {
+		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "TLS carrier")
+		err := s.Serve(ctx, conn)
 		_ = conn.Close()
 		if err != nil {
 			log.InfoWithError("fail to handle a request over TLS", err)
@@ -84,7 +78,7 @@ func ListenRequests(ctx context.Context, hg *conf.Hg, targetClient transport.Cli
 	})
 }
 
-func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
+func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 	buf := pool.Get(ioutil.BufSize)
 	defer pool.Put(buf)
 	bufReader := ioutil.NewBufioReader(buf, conn)
@@ -115,7 +109,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 			ip := netip.IPv6Loopback()
 			ctx := contextutil.WithValues(ctx, contextutil.InboundTag, "TLS carrier with wrong auth")
 			fallbackAddr := transport.NewSocketAddressByIP(&ip, s.tlsBadAuthFallbackServerPort)
-			return transport.ForwardTCP(ctx, fallbackAddr, ioutil.NewBytesReadPreloadConn(unrelatedBs, conn), targetClient)
+			return transport.ForwardTCP(ctx, fallbackAddr, ioutil.NewBytesReadPreloadConn(unrelatedBs, conn), s.targetClient)
 		} else {
 			isTrojan = true
 		}
@@ -142,5 +136,5 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	return transport.ForwardTCP(ctx, accessAddr, ioutil.NewBytesReadPreloadConn(unreadBs, conn), targetClient)
+	return transport.ForwardTCP(ctx, accessAddr, ioutil.NewBytesReadPreloadConn(unreadBs, conn), s.targetClient)
 }

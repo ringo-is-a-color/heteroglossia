@@ -8,11 +8,16 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 )
 
-type Client struct{}
+type client struct{}
 
-var _ transport.Client = new(Client)
+var _ transport.Client = new(client)
+
+func NewClient() transport.Client {
+	return new(client)
+}
+
 var rejectedErr = errors.New("rejected")
 
-func (_ *Client) Dial(_ context.Context, _ string, _ *transport.SocketAddress) (net.Conn, error) {
+func (_ *client) Dial(_ context.Context, _ string, _ *transport.SocketAddress) (net.Conn, error) {
 	return nil, rejectedErr
 }

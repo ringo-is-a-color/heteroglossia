@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/ringo-is-a-color/heteroglossia/conf"
+	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/transport/http_socks"
 	"github.com/ringo-is-a-color/heteroglossia/transport/router"
 	"github.com/ringo-is-a-color/heteroglossia/transport/tls_carrier"
@@ -48,7 +49,8 @@ func main() {
 	routeClient := router.NewClient(&config.Route, config.Misc.RulesFileAutoUpdate, config.Outbounds, config.Misc.TLSKeyLog)
 	if config.Inbounds.Hg != nil {
 		go func() {
-			err := tls_carrier.ListenRequests(context.Background(), config.Inbounds.Hg, routeClient)
+			server := tls_carrier.NewServer(config.Inbounds.Hg, routeClient)
+			err = server.ListenAndServe(context.Background())
 			if err != nil {
 				log.Fatal("fail to start the hg server", err)
 			}
@@ -56,7 +58,8 @@ func main() {
 	}
 	if config.Inbounds.HTTPSOCKS != nil {
 		go func() {
-			err := http_socks.ListenRequests(context.Background(), config.Inbounds.HTTPSOCKS, routeClient)
+			server := http_socks.NewServer(config.Inbounds.HTTPSOCKS, routeClient)
+			err := server.ListenAndServe(context.Background())
 			if err != nil {
 				log.Fatal("fail to start the HTTP/SOCKS server", err)
 			}
@@ -65,7 +68,7 @@ func main() {
 
 	if config.Misc.HgBinaryAutoUpdate {
 		go updater.StartUpdateCron(func() {
-			success, latestVersion, err := updater.UpdateHgBinary(routeClient.HTTPClient)
+			success, latestVersion, err := updater.UpdateHgBinary(transport.HTTPClientThroughRouter(routeClient))
 			if err != nil {
 				log.WarnWithError("fail to update the hg binary", err)
 			}

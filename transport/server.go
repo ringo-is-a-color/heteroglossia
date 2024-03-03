@@ -10,7 +10,9 @@ import (
 )
 
 type Server interface {
-	HandleConnection(ctx context.Context, conn net.Conn, targetClient Client) error
+	ListenAndServe(ctx context.Context) error
+
+	Serve(ctx context.Context, conn net.Conn) error
 }
 
 func ForwardTCP(ctx context.Context, accessAddr *SocketAddress, srcRwc io.ReadWriteCloser, targetClient Client) error {

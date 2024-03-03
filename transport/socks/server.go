@@ -12,11 +12,16 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type Server struct {
-	AuthInfo *conf.HTTPSOCKSAuthInfo
+type server struct {
+	authInfo     *conf.HTTPSOCKSAuthInfo
+	targetClient transport.Client
 }
 
-var _ transport.Server = new(Server)
+var _ transport.Server = new(server)
+
+func NewServer(authInfo *conf.HTTPSOCKSAuthInfo, targetClient transport.Client) transport.Server {
+	return &server{authInfo, targetClient}
+}
 
 const (
 	Sock4Version byte = 4
@@ -63,14 +68,17 @@ var (
 	helloNoAcceptableMethodsBytes = []byte{Sock5Version, helloNoAcceptableMethods}
 )
 
-// handle SOCKS5 request without the first version byte
-
-func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
-	return handleClientHelloRequest(ctx, conn, s.AuthInfo, targetClient)
+func (s *server) ListenAndServe(ctx context.Context) error {
+	panic("no implemented")
 }
 
-func handleClientHelloRequest(ctx context.Context, conn net.Conn, authInfo *conf.HTTPSOCKSAuthInfo,
-	targetClient transport.Client) error {
+// handle SOCKS5 request without the first version byte
+
+func (s *server) Serve(ctx context.Context, conn net.Conn) error {
+	return s.handleClientHelloRequest(ctx, conn)
+}
+
+func (s *server) handleClientHelloRequest(ctx context.Context, conn net.Conn) error {
 	// the version byte of the SOCKS5 protocol is already checked in the http_socks package
 	// so we start to check the 'methods' directly
 	methods, err := ioutil.ReadByUint8(conn)
@@ -79,12 +87,12 @@ func handleClientHelloRequest(ctx context.Context, conn net.Conn, authInfo *conf
 	}
 
 	switch {
-	case authInfo.IsEmpty() && slices.Contains(methods, helloNoAuthRequired):
+	case s.authInfo.IsEmpty() && slices.Contains(methods, helloNoAuthRequired):
 		err = ioutil.Write_(conn, helloNoAuthBytes)
-	case !authInfo.IsEmpty() && slices.Contains(methods, helloUsernamePassword):
+	case !s.authInfo.IsEmpty() && slices.Contains(methods, helloUsernamePassword):
 		err = ioutil.Write_(conn, helloUsernamePasswordBytes)
 		if err == nil {
-			err = handleClientAuthenticationRequest(conn, authInfo)
+			err = s.handleClientAuthenticationRequest(conn)
 		}
 	default:
 		err = ioutil.Write_(conn, helloNoAcceptableMethodsBytes)
@@ -96,7 +104,7 @@ func handleClientHelloRequest(ctx context.Context, conn net.Conn, authInfo *conf
 	if err != nil {
 		return err
 	}
-	return handleClientConnectionRequest(ctx, conn, targetClient)
+	return s.handleClientConnectionRequest(ctx, conn)
 }
 
 /*
@@ -122,12 +130,12 @@ Response
 var authUsernamePasswordSuccessBytes = []byte{authUsernamePasswordVersion, authUsernamePasswordSuccess}
 var authUsernamePasswordFailureBytes = []byte{authUsernamePasswordVersion, authUsernamePasswordFailure}
 
-func handleClientAuthenticationRequest(conn net.Conn, authInfo *conf.HTTPSOCKSAuthInfo) error {
+func (s *server) handleClientAuthenticationRequest(conn net.Conn) error {
 	authInfoFromRequest, err := readClientAuthUsernamePassword(conn)
 	if err != nil {
 		return err
 	}
-	if authInfo.NotEqual(authInfoFromRequest) {
+	if s.authInfo.NotEqual(authInfoFromRequest) {
 		err = ioutil.Write_(conn, authUsernamePasswordFailureBytes)
 		return errors.Join(errors.New("incorrect username or password"), err)
 	}
@@ -180,7 +188,7 @@ var connectionCommandNotSupportedBytes = []byte{Sock5Version, connectionCommandN
 var connectionSucceededPrefix = []byte{Sock5Version, connectionSucceeded, connectionReserved,
 	1, 0, 0, 0, 0, 0, 0}
 
-func handleClientConnectionRequest(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
+func (s *server) handleClientConnectionRequest(ctx context.Context, conn net.Conn) error {
 	_, bs, err := ioutil.ReadN(conn, 3)
 	if err != nil {
 		return err
@@ -201,5 +209,5 @@ func handleClientConnectionRequest(ctx context.Context, conn net.Conn, targetCli
 	if err != nil {
 		return err
 	}
-	return transport.ForwardTCP(ctx, accessAddr, conn, targetClient)
+	return transport.ForwardTCP(ctx, accessAddr, conn, s.targetClient)
 }

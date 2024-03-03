@@ -13,7 +13,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/randutil"
 )
 
-type Client struct {
+type client struct {
 	proxyNode    *conf.ProxyNode
 	preSharedKey []byte
 	aeadOverhead int
@@ -21,13 +21,13 @@ type Client struct {
 	exPicker func() int
 }
 
-var _ transport.Client = new(Client)
+var _ transport.Client = new(client)
 
-func NewClient(proxyNode *conf.ProxyNode) *Client {
-	return &Client{proxyNode, proxyNode.Password.Raw[:], gcmTagOverhead, randutil.WeightedIntN(2)}
+func NewClient(proxyNode *conf.ProxyNode) transport.Client {
+	return &client{proxyNode, proxyNode.Password.Raw[:], gcmTagOverhead, randutil.WeightedIntN(2)}
 }
 
-func (c *Client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
+func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
 	err := netutil.ValidateTCP(network)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (c *Client) Dial(ctx context.Context, network string, addr *transport.Socke
 }
 
 // https://gfw.report/publications/usenixsecurity23/en/
-func (c *Client) customFirstReqPrefixes(bs []byte) {
+func (c *client) customFirstReqPrefixes(bs []byte) {
 	switch c.exPicker() {
 	case 0:
 		// Ex2 exemption

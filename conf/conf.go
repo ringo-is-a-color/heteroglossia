@@ -27,7 +27,7 @@ type HTTPSOCKS struct {
 	SystemProxy bool   `json:"system-proxy"`
 }
 
-func (httpSOCKS *HTTPSOCKS) toHTTPSOCKSAuthInfo() *HTTPSOCKSAuthInfo {
+func (httpSOCKS *HTTPSOCKS) ToHTTPSOCKSAuthInfo() *HTTPSOCKSAuthInfo {
 	return &HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
 }
 

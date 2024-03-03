@@ -19,18 +19,18 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/osutil"
 )
 
-type Client struct {
+type client struct {
 	proxyNode           *conf.ProxyNode
 	tlsConfig           *tls.Config
 	passwordWithoutCRLF [16]byte
 }
 
-var _ transport.Client = new(Client)
+var _ transport.Client = new(client)
 
 const tlsKeyLogFilepath = "logs/tls_key.log"
 
-func NewClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*Client, error) {
-	clientHandler := &Client{proxyNode: proxyNode}
+func NewClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (transport.Client, error) {
+	clientHandler := &client{proxyNode: proxyNode}
 	if proxyNode.TLSCertFile == "" {
 		clientHandler.tlsConfig = &tls.Config{
 			ServerName: proxyNode.Host,
@@ -82,7 +82,7 @@ func NewClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*Client, error) {
 	return clientHandler, nil
 }
 
-func (c *Client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
+func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
 	err := netutil.ValidateTCP(network)
 	if err != nil {
 		return nil, err

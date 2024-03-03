@@ -8,11 +8,15 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
-type Client struct{}
+type client struct{}
 
-var _ transport.Client = new(Client)
+var _ transport.Client = new(client)
 
-func (_ *Client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
+func NewClient() transport.Client {
+	return new(client)
+}
+
+func (_ *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
 	err := netutil.ValidateTCPorUDP(network)
 	if err != nil {
 		return nil, err

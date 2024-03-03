@@ -17,19 +17,19 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/updater"
 )
 
-type Client struct {
+type client struct {
 	route             *conf.Route
 	routeRulesRWMutex *sync.RWMutex
 	outbounds         map[string]*conf.ProxyNode
 	tlsKeyLog         bool
-	HTTPClient        *http.Client
+	httpClient        *http.Client
 }
 
-var _ transport.Client = new(Client)
+var _ transport.Client = new(client)
 
-func NewClient(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[string]*conf.ProxyNode, tlsKeyLog bool) *Client {
-	router := &Client{route, new(sync.RWMutex), outbounds, tlsKeyLog, nil}
-	router.HTTPClient = transport.HTTPClientThroughRouter(router)
+func NewClient(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[string]*conf.ProxyNode, tlsKeyLog bool) transport.Client {
+	router := &client{route, new(sync.RWMutex), outbounds, tlsKeyLog, nil}
+	router.httpClient = transport.HTTPClientThroughRouter(router)
 	if autoUpdateRuleFiles {
 		go updater.StartUpdateCron(func() {
 			router.updateRoute()
@@ -38,7 +38,7 @@ func NewClient(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[string
 	return router
 }
 
-func (c *Client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
+func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
 	c.routeRulesRWMutex.RLock()
 	err := netutil.ValidateTCP(network)
 	if err != nil {
@@ -70,9 +70,9 @@ func (c *Client) Dial(ctx context.Context, network string, addr *transport.Socke
 	var nextClient transport.Client
 	switch policy {
 	case "direct":
-		nextClient = new(direct.Client)
+		nextClient = direct.NewClient()
 	case "reject":
-		nextClient = new(reject.Client)
+		nextClient = reject.NewClient()
 	default:
 		proxyNode := c.outbounds[policy]
 		var err error
@@ -86,8 +86,8 @@ func (c *Client) Dial(ctx context.Context, network string, addr *transport.Socke
 	return nextClient.Dial(ctx, network, addr)
 }
 
-func (c *Client) updateRoute() {
-	success, err := updater.UpdateRuleFile(c.HTTPClient)
+func (c *client) updateRoute() {
+	success, err := updater.UpdateRuleFile(c.httpClient)
 	if err != nil {
 		log.WarnWithError("fail to update rules' files", err)
 		return

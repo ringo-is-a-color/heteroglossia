@@ -19,25 +19,27 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/proxy"
 )
 
-type Server struct {
-	http  transport.Server
-	socks transport.Server
+type server struct {
+	httpSOCKS    *conf.HTTPSOCKS
+	http         transport.Server
+	socks        transport.Server
+	targetClient transport.Client
 }
 
-var _ transport.Server = new(Server)
+var _ transport.Server = new(server)
 
-func newServer(authInfo *conf.HTTPSOCKSAuthInfo) *Server {
-	return &Server{&http.Server{AuthInfo: authInfo}, &socks.Server{AuthInfo: authInfo}}
+func NewServer(httpSOCKS *conf.HTTPSOCKS, targetClient transport.Client) transport.Server {
+	authInfo := httpSOCKS.ToHTTPSOCKSAuthInfo()
+	return &server{httpSOCKS, http.NewServer(authInfo, targetClient),
+		socks.NewServer(authInfo, targetClient), targetClient}
 }
 
-func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient transport.Client) error {
+func (s *server) ListenAndServe(ctx context.Context) error {
 	// can't listen to IPv4 & IPv6 together due to https://github.com/golang/go/issues/9334
 	// so also listen to IPv4 one when using '::1' or '::'
-	var host = httpSOCKS.Host
-	authInfo := &conf.HTTPSOCKSAuthInfo{Username: httpSOCKS.Username, Password: httpSOCKS.Password}
-	server := newServer(authInfo)
+	var host = s.httpSOCKS.Host
 	connHandler := func(conn *net.TCPConn) {
-		err := server.HandleConnection(ctx, conn, targetClient)
+		err := s.Serve(ctx, conn)
 		_ = conn.Close()
 		if err != nil {
 			log.InfoWithError("fail to handle a HTTP/SOCKS request", err)
@@ -46,7 +48,7 @@ func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient
 
 	var ipv4RequestsHandlerForDualstack func() error
 	if host == "::1" {
-		ipv4Localhost := net.JoinHostPort("127.0.0.1", strconv.Itoa(int(httpSOCKS.Port)))
+		ipv4Localhost := net.JoinHostPort("127.0.0.1", strconv.Itoa(int(s.httpSOCKS.Port)))
 		ipv4RequestsHandlerForDualstack = func() error {
 			return netutil.ListenTCPAndServe(ctx, ipv4Localhost, connHandler)
 		}
@@ -55,16 +57,16 @@ func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient
 		host = ""
 	}
 
-	addr := net.JoinHostPort(host, strconv.Itoa(int(httpSOCKS.Port)))
+	addr := net.JoinHostPort(host, strconv.Itoa(int(s.httpSOCKS.Port)))
 	return parRunWithFirstErrReturn(func() error {
 		var unsetProxy func()
 		var hasUnsetProxy atomic.Bool
 		return netutil.ListenTCPAndServeWithCallback(ctx, addr, connHandler, func(_ net.Listener) {
-			if httpSOCKS.SystemProxy {
+			if s.httpSOCKS.SystemProxy {
 				log.Info("try to set the system proxy")
 				// do not use the 'host' variable directly because we changed it for '::'
 				var err error
-				unsetProxyFunction, err := proxy.SetSystemProxy(httpSOCKS.Host, httpSOCKS.Port, authInfo)
+				unsetProxyFunction, err := proxy.SetSystemProxy(s.httpSOCKS.Host, s.httpSOCKS.Port, s.httpSOCKS.ToHTTPSOCKSAuthInfo())
 				if err != nil {
 					log.WarnWithError("fail to set the system proxy", err)
 				}
@@ -85,7 +87,7 @@ func ListenRequests(ctx context.Context, httpSOCKS *conf.HTTPSOCKS, targetClient
 	}, ipv4RequestsHandlerForDualstack)
 }
 
-func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
+func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 	b, err := ioutil.Read1(conn)
 	if err != nil {
 		return err
@@ -95,11 +97,11 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 		return errors.New("SOCKS4 protocol is not supported, only SOCKS5 is supported")
 	case socks.Sock5Version:
 		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "SOCKS5 Proxy")
-		return s.socks.HandleConnection(ctx, conn, targetClient)
+		return s.socks.Serve(ctx, conn)
 	default:
 		// assume this is an HTTP proxy request
 		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "HTTP Proxy")
-		return s.http.HandleConnection(ctx, ioutil.NewBytesReadPreloadConn([]byte{b}, conn), targetClient)
+		return s.http.Serve(ctx, ioutil.NewBytesReadPreloadConn([]byte{b}, conn))
 	}
 }
 

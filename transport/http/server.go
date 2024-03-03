@@ -14,11 +14,16 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 )
 
-type Server struct {
-	AuthInfo *conf.HTTPSOCKSAuthInfo
+type server struct {
+	authInfo     *conf.HTTPSOCKSAuthInfo
+	targetClient transport.Client
 }
 
-var _ transport.Server = new(Server)
+var _ transport.Server = new(server)
+
+func NewServer(authInfo *conf.HTTPSOCKSAuthInfo, targetClient transport.Client) transport.Server {
+	return &server{authInfo, targetClient}
+}
 
 // see https://www.mnot.net/blog/2011/07/11/what_proxies_must_do point 1
 // point 0: always advise HTTP 1.1
@@ -32,7 +37,11 @@ var connectSuccessBytes = []byte("HTTP/1.1 200 OK\r\n\r\n")
 // forked from https://github.com/database64128/shadowsocks-go/blob/88c2d63ccd0b022f76902195ceb1559eaf15a3a7/http/server.go
 // always consider connection persistent and take little care of HTTP connection header to make the impl simper
 
-func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClient transport.Client) error {
+func (s *server) ListenAndServe(_ context.Context) error {
+	panic("not implemented")
+}
+
+func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 	buf := pool.Get(ioutil.BufSize)
 	defer pool.Put(buf)
 	connBufReader := ioutil.NewBufioReader(buf, conn)
@@ -57,9 +66,9 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 	if err != nil {
 		return errors.Join(err, httpError(req, conn, http.StatusBadRequest))
 	}
-	if !s.AuthInfo.IsEmpty() {
+	if !s.authInfo.IsEmpty() {
 		username, password, ok := parse(req)
-		if !ok || s.AuthInfo.NotEqual2(username, password) {
+		if !ok || s.authInfo.NotEqual2(username, password) {
 			return errors.Join(errors.New("no authentication info, or incorrect username/password"),
 				httpError(req, conn, http.StatusProxyAuthRequired))
 		}
@@ -74,7 +83,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		return transport.ForwardTCP(ctx, addr, ioutil.NewBytesReadPreloadConn(unreadBs, conn), targetClient)
+		return transport.ForwardTCP(ctx, addr, ioutil.NewBytesReadPreloadConn(unreadBs, conn), s.targetClient)
 	}
 
 	lp, rp := net.Pipe()
@@ -128,7 +137,7 @@ func (s *Server) HandleConnection(ctx context.Context, conn net.Conn, targetClie
 		}
 	}()
 
-	return transport.ForwardTCP(ctx, addr, rp, targetClient)
+	return transport.ForwardTCP(ctx, addr, rp, s.targetClient)
 }
 
 func parse(r *http.Request) (username, password string, ok bool) {
