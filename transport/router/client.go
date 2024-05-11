@@ -10,7 +10,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/transport/direct"
 	"github.com/ringo-is-a-color/heteroglossia/transport/reject"
-	"github.com/ringo-is-a-color/heteroglossia/transport/tls_carrier"
+	"github.com/ringo-is-a-color/heteroglossia/transport/tr_carrier"
 	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
@@ -76,7 +76,7 @@ func (c *client) Dial(ctx context.Context, network string, addr *transport.Socke
 	default:
 		proxyNode := c.outbounds[policy]
 		var err error
-		nextClient, err = tls_carrier.NewClient(proxyNode, c.tlsKeyLog)
+		nextClient, err = tr_carrier.NewClient(proxyNode, c.tlsKeyLog)
 		if err != nil {
 			return nil, err
 		}

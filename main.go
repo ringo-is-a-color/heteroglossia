@@ -15,7 +15,7 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/transport/http_socks"
 	"github.com/ringo-is-a-color/heteroglossia/transport/router"
-	"github.com/ringo-is-a-color/heteroglossia/transport/tls_carrier"
+	"github.com/ringo-is-a-color/heteroglossia/transport/tr_carrier"
 	"github.com/ringo-is-a-color/heteroglossia/util/cli"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
@@ -49,7 +49,7 @@ func main() {
 	routeClient := router.NewClient(&config.Route, config.Misc.RulesFileAutoUpdate, config.Outbounds, config.Misc.TLSKeyLog)
 	if config.Inbounds.Hg != nil {
 		go func() {
-			server := tls_carrier.NewServer(config.Inbounds.Hg, routeClient)
+			server := tr_carrier.NewServer(config.Inbounds.Hg, routeClient)
 			err = server.ListenAndServe(context.Background())
 			if err != nil {
 				log.Fatal("fail to start the hg server", err)
