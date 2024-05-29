@@ -121,7 +121,9 @@ func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 			}
 			req, werr = readRequest(connBufReader)
 			if werr != nil {
-				if !errors.IsIoEof(werr) {
+				if errors.IsIoEof(werr) {
+					werr = nil
+				} else {
 					werr = errors.WithStack(werr)
 				}
 				break
@@ -133,7 +135,7 @@ func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 			log.InfoWithError("fail to read request", rerr)
 		}
 		if werr != nil {
-			log.InfoWithError("fail to write resp", rerr)
+			log.InfoWithError("fail to write resp", werr)
 		}
 	}()
 
