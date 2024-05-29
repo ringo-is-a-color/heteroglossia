@@ -94,6 +94,8 @@ func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 	}
 	switch b {
 	case socks.Sock4Version:
+		log.Info("route", contextutil.SourceTag, conn.RemoteAddr().String(),
+			contextutil.InboundTag, "SOCKS4 Proxy", "access", "policy", "rejected")
 		return errors.New("SOCKS4 protocol is not supported, only SOCKS5 is supported")
 	case socks.Sock5Version:
 		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "SOCKS5 Proxy")
