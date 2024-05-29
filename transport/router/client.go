@@ -63,7 +63,7 @@ func (c *client) Dial(ctx context.Context, network string, addr *transport.Socke
 		}
 	}
 	c.routeRulesRWMutex.RUnlock()
-	if policy == "" {
+	if policy == "final" || policy == "" {
 		policy = c.route.Final
 	}
 
