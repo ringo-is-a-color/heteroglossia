@@ -46,14 +46,14 @@ gsettings set org.gnome.system.proxy.socks port %[2]v`),
 		// there is a KDE bug that it fails to set a URL including both auth info and IPv6 address (e.g., http://username:password@[::1]:1080
 		kdeProxyHostWithPort = fmt.Sprintf("%v:%v@%v:%v", url.QueryEscape(authInfo.Username), url.QueryEscape(authInfo.Password), host, port)
 	}
-	kde5ProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
-kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy '%v' && 
-kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '%v' && 
-kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy '%v'`),
+	kdeProxySetCommand := fmt.Sprintf(trimNewLinesForRawStringLiteral(`kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 && 
+kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key httpProxy '%v' && 
+kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '%v' && 
+kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key socksProxy '%v'`),
 		"http://"+kdeProxyHostWithPort, "http://"+kdeProxyHostWithPort, "socks://"+kdeProxyHostWithPort)
-	_, err = cmd.Run("/bin/sh", "-c", kde5ProxySetCommand)
+	_, err = cmd.Run("/bin/sh", "-c", kdeProxySetCommand)
 	if err != nil {
-		log.WarnWithError("fail to set system proxy for KDE 5", err)
+		log.WarnWithError("fail to set system proxy for KDE 6", err)
 	}
 	return func() {
 		unsetSystemProxy()
@@ -81,13 +81,13 @@ gsettings set org.gnome.system.proxy.socks port 0`)
 		log.Info("standard error output (which might be expected) when running commands to unset the system proxy for Gnome", "stderr", stderr)
 	}
 
-	kde5ProxyUnsetCommand := trimNewLinesForRawStringLiteral(`kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 0 && 
-kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy '' && 
-kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '' && 
-kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy ''`)
-	_, err = cmd.Run("/bin/sh", "-c", kde5ProxyUnsetCommand)
+	kdeProxyUnsetCommand := trimNewLinesForRawStringLiteral(`kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key ProxyType 0 && 
+kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key httpProxy '' && 
+kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key httpsProxy '' && 
+kwriteconfig6 --file kioslaverc --group 'Proxy Settings' --key socksProxy ''`)
+	_, err = cmd.Run("/bin/sh", "-c", kdeProxyUnsetCommand)
 	if err != nil {
-		log.WarnWithError("fail to remove the system proxy for KDE 5", err)
+		log.WarnWithError("fail to remove the system proxy for KDE 6", err)
 		err = nil
 	}
 }
