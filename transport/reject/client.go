@@ -18,6 +18,6 @@ func NewClient() transport.Client {
 
 var rejectedErr = errors.New("rejected")
 
-func (_ *client) Dial(_ context.Context, _ string, _ *transport.SocketAddress) (net.Conn, error) {
+func (*client) Dial(_ context.Context, _ string, _ *transport.SocketAddress) (net.Conn, error) {
 	return nil, rejectedErr
 }

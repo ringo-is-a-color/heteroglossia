@@ -42,7 +42,7 @@ func (s *server) ListenAndServe(ctx context.Context) error {
 func (s *server) Serve(ctx context.Context, conn net.Conn) error {
 	serverConn := newServerConn(conn.(*net.TCPConn), s.preSharedKey, s.aeadOverhead, s.saltPool)
 	// this is needed to get the access address for 'targetClient'
-	err := serverConn.readClientFirstPacket()
+	err := serverConn.readClientFirstPayload()
 	if err != nil {
 		return err
 	}

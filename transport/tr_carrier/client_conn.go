@@ -14,9 +14,9 @@ import (
 
 type clientConn struct {
 	net.Conn
-	accessAddr          *transport.SocketAddress
-	passwordWithCRLF    [16]byte
-	hasWriteFirstPacket bool
+	accessAddr           *transport.SocketAddress
+	passwordWithCRLF     [16]byte
+	hasWriteFirstPayload bool
 }
 
 var _ net.Conn = new(clientConn)
@@ -28,9 +28,9 @@ func newClientConn(conn net.Conn, accessAddr *transport.SocketAddress, passwordW
 }
 
 func (c *clientConn) Write(b []byte) (n int, err error) {
-	if !c.hasWriteFirstPacket {
-		c.hasWriteFirstPacket = true
-		return c.writeClientFirstPacket(b)
+	if !c.hasWriteFirstPayload {
+		c.hasWriteFirstPayload = true
+		return c.writeClientFirstPayload(b)
 	}
 	return c.Conn.Write(b)
 }
@@ -45,14 +45,14 @@ https://trojan-gfw.github.io/trojan/protocol
 +-----------------------+---------+----------------+---------+----------+
 */
 
-func (c *clientConn) writeClientFirstPacket(payload []byte) (int, error) {
+func (c *clientConn) writeClientFirstPayload(payload []byte) (int, error) {
 	// 16 + 2 = len(password) + len(CRLF)
 	// we don't write the second CRLF like Trojan protocol
 	headerSize := 16 + 2 + socksLikeRequestSizeInBytes(c.accessAddr)
-	firstPacketBs := pool.Get(headerSize + len(payload))
-	defer pool.Put(firstPacketBs)
+	firstPayloadBs := pool.Get(headerSize + len(payload))
+	defer pool.Put(firstPayloadBs)
 
-	buf := bytes.NewBuffer(firstPacketBs[:0])
+	buf := bytes.NewBuffer(firstPayloadBs[:0])
 	buf.Write(c.passwordWithCRLF[:])
 	buf.Write(crlf)
 	writeSocksLikeConnectionCommandRequest(buf, c.accessAddr)
@@ -65,22 +65,22 @@ func (c *clientConn) writeClientFirstPacket(payload []byte) (int, error) {
 
 func (c *clientConn) ReadFrom(r io.Reader) (n int64, err error) {
 	var count int
-	if !c.hasWriteFirstPacket {
-		c.hasWriteFirstPacket = true
-		firstPacketBs := pool.Get(ioutil.BufSize)
+	if !c.hasWriteFirstPayload {
+		c.hasWriteFirstPayload = true
+		firstPayloadBs := pool.Get(ioutil.BufSize)
 
 		for {
-			count, err = r.Read(firstPacketBs)
+			count, err = r.Read(firstPayloadBs)
 			if err != nil && !errors.IsIoEof(err) {
-				pool.Put(firstPacketBs)
+				pool.Put(firstPayloadBs)
 				return int64(count), err
 			}
 			if count > 0 || errors.IsIoEof(err) {
 				break
 			}
 		}
-		_, err = c.writeClientFirstPacket(firstPacketBs[:count])
-		pool.Put(firstPacketBs)
+		_, err = c.writeClientFirstPayload(firstPayloadBs[:count])
+		pool.Put(firstPayloadBs)
 		if err != nil {
 			return int64(count), err
 		}

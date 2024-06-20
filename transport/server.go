@@ -3,7 +3,6 @@ package transport
 import (
 	"context"
 	"io"
-	"net"
 
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
@@ -11,8 +10,6 @@ import (
 
 type Server interface {
 	ListenAndServe(ctx context.Context) error
-
-	Serve(ctx context.Context, conn net.Conn) error
 }
 
 func ForwardTCP(ctx context.Context, accessAddr *SocketAddress, srcRwc io.ReadWriteCloser, targetClient Client) error {

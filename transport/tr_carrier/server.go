@@ -41,26 +41,21 @@ func NewServer(hg *conf.Hg, targetClient transport.Client) transport.Server {
 }
 
 func (s *server) ListenAndServe(ctx context.Context) error {
-	if s.hg.TLSCertKeyPair == nil {
-		s.tlsConfig = tlsConfigWithAutomatedCertificate(ctx, s.hg.Host)
-	} else {
-		cert, err := tls.LoadX509KeyPair(s.hg.TLSCertKeyPair.CertFile, s.hg.TLSCertKeyPair.KeyFile)
-		if err != nil {
-			return errors.New(err, "fail to load TLS Certificate/Key pair files")
-		}
-		s.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+	var err error
+	s.tlsConfig, err = netutil.TLSServerConfig(s.hg)
+	if err != nil {
+		return err
 	}
 
 	port := make(chan uint16, 1)
 	go func() {
-		err := netutil.ListenTCPAndAccept(ctx, ":0", func(ln net.Listener) error {
-			var handler http.Handler = nil
-			if s.hg.TLSBadAuthFallbackSiteDir != "" {
-				handler = http.FileServer(http.Dir(s.hg.TLSBadAuthFallbackSiteDir))
-			}
+		var httpHandler http.Handler = nil
+		if s.hg.TLSBadAuthFallbackSiteDir != "" {
+			httpHandler = http.FileServer(http.Dir(s.hg.TLSBadAuthFallbackSiteDir))
+		}
+		err := netutil.ListenHTTPAndServeWithListenerCallback(ctx, ":0", httpHandler, func(ln net.Listener) {
 			port <- uint16(ln.Addr().(*net.TCPAddr).Port)
-			return errors.WithStack(http.Serve(ln, handler))
-		}, nil)
+		})
 		if err != nil {
 			log.Fatal("fail to serve a fallback server", err)
 		}

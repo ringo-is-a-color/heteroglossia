@@ -1,61 +1,24 @@
 package socks
 
 import (
-	"encoding/binary"
 	"io"
-	"net/netip"
 
 	"github.com/ringo-is-a-color/heteroglossia/transport"
-	"github.com/ringo-is-a-color/heteroglossia/util/errors"
-	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 )
 
 const (
-	connectionAddressIpv4   byte = 1
-	connectionAddressIpv6   byte = 4
-	connectionAddressDomain byte = 3
+	// https://datatracker.ietf.org/doc/html/rfc1928#section-4
+	// ATYP   address type of following address
+	//   o  IP V4 address: X'01'
+	//   o  DOMAINNAME: X'03'
+	//   o  IP V6 address: X'04'
+	connectionAddressIpv4   byte = 0x01
+	connectionAddressIpv6   byte = 0x04
+	connectionAddressDomain byte = 0x03
 )
 
+var socksAddressType = [3]byte{connectionAddressIpv4, connectionAddressIpv6, connectionAddressDomain}
+
 func ReadSOCKS5Address(r io.Reader) (dest *transport.SocketAddress, err error) {
-	addressType, err := ioutil.Read1(r)
-	if err != nil {
-		return
-	}
-
-	var ip *netip.Addr
-	var domain string
-	switch addressType {
-	case connectionAddressIpv4:
-		_, ipv4, err := ioutil.ReadN(r, 4)
-		if err != nil {
-			return nil, err
-		}
-		addr := netip.AddrFrom4([4]byte(ipv4))
-		ip = &addr
-	case connectionAddressIpv6:
-		_, ipv6, err := ioutil.ReadN(r, 16)
-		if err != nil {
-			return nil, err
-		}
-		addr := netip.AddrFrom16([16]byte(ipv6))
-		ip = &addr
-	case connectionAddressDomain:
-		domain, err = ioutil.ReadStringByUint8(r)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		err = errors.Newf("unknown address type %v", addressType)
-		return
-	}
-	_, portBs, err := ioutil.ReadN(r, 2)
-	if err != nil {
-		return
-	}
-
-	port := binary.BigEndian.Uint16(portBs)
-	if ip != nil {
-		return transport.NewSocketAddressByIP(ip, port), nil
-	}
-	return transport.NewSocketAddressByDomain(domain, port), nil
+	return transport.ReadAddressWithType(r, socksAddressType)
 }

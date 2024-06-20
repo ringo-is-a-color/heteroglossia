@@ -16,7 +16,7 @@ func NewClient() transport.Client {
 	return new(client)
 }
 
-func (_ *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
+func (*client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
 	err := netutil.ValidateTCPorUDP(network)
 	if err != nil {
 		return nil, err

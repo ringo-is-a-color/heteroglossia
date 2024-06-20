@@ -99,10 +99,10 @@ func selfRestart() {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Env = os.Environ()
-		netutil.StopAllListeners()
+		netutil.StopAllServerListeners()
 		err = cmd.Run()
 		if err != nil {
-			log.Fatal("fail to start the new hg binary", errors.WithStack(err))
+			log.InfoWithError("fail to start the new hg binary", errors.WithStack(err))
 		}
 		osutil.Exit(0)
 	}

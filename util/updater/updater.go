@@ -127,8 +127,8 @@ func verifyRulesFileSHA256Sum(file *os.File, sha256SumFile *os.File, filename st
 	downloadFileSum := hex.EncodeToString(hash.Sum(nil))
 
 	scanner := bufio.NewScanner(sha256SumFile)
-	regexString := fmt.Sprintf("^([^\\s]+)%v%v$", "\\s+", regexp.QuoteMeta(filename))
-	regex := regexp.MustCompile(regexString)
+	regexStr := fmt.Sprintf("^([^\\s]+)%v%v$", "\\s+", regexp.QuoteMeta(filename))
+	regex := regexp.MustCompile(regexStr)
 	expectedSum := ""
 	for scanner.Scan() {
 		match := regex.FindStringSubmatch(scanner.Text())

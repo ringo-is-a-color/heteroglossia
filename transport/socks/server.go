@@ -12,15 +12,15 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type server struct {
+type Server struct {
 	authInfo     *conf.HTTPSOCKSAuthInfo
 	targetClient transport.Client
 }
 
-var _ transport.Server = new(server)
+var _ transport.Server = new(Server)
 
-func NewServer(authInfo *conf.HTTPSOCKSAuthInfo, targetClient transport.Client) transport.Server {
-	return &server{authInfo, targetClient}
+func NewServer(authInfo *conf.HTTPSOCKSAuthInfo, targetClient transport.Client) *Server {
+	return &Server{authInfo, targetClient}
 }
 
 const (
@@ -68,17 +68,17 @@ var (
 	helloNoAcceptableMethodsBytes = []byte{Sock5Version, helloNoAcceptableMethods}
 )
 
-func (s *server) ListenAndServe(ctx context.Context) error {
+func (s *Server) ListenAndServe(ctx context.Context) error {
 	panic("no implemented")
 }
 
 // handle SOCKS5 request without the first version byte
 
-func (s *server) Serve(ctx context.Context, conn net.Conn) error {
+func (s *Server) Serve(ctx context.Context, conn net.Conn) error {
 	return s.handleClientHelloRequest(ctx, conn)
 }
 
-func (s *server) handleClientHelloRequest(ctx context.Context, conn net.Conn) error {
+func (s *Server) handleClientHelloRequest(ctx context.Context, conn net.Conn) error {
 	// the version byte of the SOCKS5 protocol is already checked in the http_socks package
 	// so we start to check the 'methods' directly
 	methods, err := ioutil.ReadByUint8(conn)
@@ -130,7 +130,7 @@ Response
 var authUsernamePasswordSuccessBytes = []byte{authUsernamePasswordVersion, authUsernamePasswordSuccess}
 var authUsernamePasswordFailureBytes = []byte{authUsernamePasswordVersion, authUsernamePasswordFailure}
 
-func (s *server) handleClientAuthenticationRequest(conn net.Conn) error {
+func (s *Server) handleClientAuthenticationRequest(conn net.Conn) error {
 	authInfoFromRequest, err := readClientAuthUsernamePassword(conn)
 	if err != nil {
 		return err
@@ -148,7 +148,7 @@ func readClientAuthUsernamePassword(r io.Reader) (authInfo *conf.HTTPSOCKSAuthIn
 		return
 	}
 	if version != authUsernamePasswordVersion {
-		err = errors.Newf("excepted version %v in the Client Authentication request, but got %v", authUsernamePasswordVersion, version)
+		err = errors.Newf("excepted version %v in the client authentication request, but got %v", authUsernamePasswordVersion, version)
 		return
 	}
 
@@ -188,7 +188,7 @@ var connectionCommandNotSupportedBytes = []byte{Sock5Version, connectionCommandN
 var connectionSucceededPrefix = []byte{Sock5Version, connectionSucceeded, connectionReserved,
 	1, 0, 0, 0, 0, 0, 0}
 
-func (s *server) handleClientConnectionRequest(ctx context.Context, conn net.Conn) error {
+func (s *Server) handleClientConnectionRequest(ctx context.Context, conn net.Conn) error {
 	_, bs, err := ioutil.ReadN(conn, 3)
 	if err != nil {
 		return err

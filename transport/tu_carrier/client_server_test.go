@@ -1,4 +1,4 @@
-package ss_carrier
+package tu_carrier
 
 import (
 	"testing"
@@ -13,5 +13,5 @@ func TestClientServerConnection(t *testing.T) {
 }
 
 func newClient(serverConf *conf.Config) (transport.Client, error) {
-	return NewClient(test.ToProxyNode(serverConf.Inbounds.Hg)), nil
+	return NewClient(test.ToProxyNode(serverConf.Inbounds.Hg), false)
 }

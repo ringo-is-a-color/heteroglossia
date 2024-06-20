@@ -2,12 +2,15 @@ package transport
 
 import (
 	"context"
+	"encoding/binary"
+	"io"
 	"net"
 	"net/netip"
 	"strconv"
 	"strings"
 
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
+	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 )
 
 type SocketAddress struct {
@@ -45,6 +48,56 @@ func NewSocketAddressByDomain(domain string, port uint16) *SocketAddress {
 	addr.Port = port
 	addr.AddrType = Domain
 	return addr
+}
+
+// https://datatracker.ietf.org/doc/html/rfc1928#section-4
+//  +------+----------+----------+
+//  | ATYP | DST.ADDR | DST.PORT |
+//  +------+----------+----------+
+//  |  1   | Variable |    2     |
+//  +------+----------+----------+
+
+func ReadAddressWithType(r io.Reader, addressTypeBs [3]byte) (*SocketAddress, error) {
+	addressType, err := ioutil.Read1(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var ip *netip.Addr
+	var domain string
+	switch addressType {
+	case addressTypeBs[0]:
+		_, ipv4, err := ioutil.ReadN(r, 4)
+		if err != nil {
+			return nil, err
+		}
+		addr := netip.AddrFrom4([4]byte(ipv4))
+		ip = &addr
+	case addressTypeBs[1]:
+		_, ipv6, err := ioutil.ReadN(r, 16)
+		if err != nil {
+			return nil, err
+		}
+		addr := netip.AddrFrom16([16]byte(ipv6))
+		ip = &addr
+	case addressTypeBs[2]:
+		domain, err = ioutil.ReadStringByUint8(r)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.Newf("unknown address type %v", addressType)
+	}
+	_, portBs, err := ioutil.ReadN(r, 2)
+	if err != nil {
+		return nil, err
+	}
+
+	port := binary.BigEndian.Uint16(portBs)
+	if ip != nil {
+		return NewSocketAddressByIP(ip, port), nil
+	}
+	return NewSocketAddressByDomain(domain, port), nil
 }
 
 // Host examples:

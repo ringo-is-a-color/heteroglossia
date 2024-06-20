@@ -21,17 +21,18 @@ import (
 
 type server struct {
 	httpSOCKS    *conf.HTTPSOCKS
-	http         transport.Server
-	socks        transport.Server
 	targetClient transport.Client
+
+	http  *http.Server
+	socks *socks.Server
 }
 
 var _ transport.Server = new(server)
 
 func NewServer(httpSOCKS *conf.HTTPSOCKS, targetClient transport.Client) transport.Server {
 	authInfo := httpSOCKS.ToHTTPSOCKSAuthInfo()
-	return &server{httpSOCKS, http.NewServer(authInfo, targetClient),
-		socks.NewServer(authInfo, targetClient), targetClient}
+	return &server{httpSOCKS, targetClient,
+		http.NewServer(authInfo, targetClient), socks.NewServer(authInfo, targetClient)}
 }
 
 func (s *server) ListenAndServe(ctx context.Context) error {
@@ -61,7 +62,7 @@ func (s *server) ListenAndServe(ctx context.Context) error {
 	return parRunWithFirstErrReturn(func() error {
 		var unsetProxy func()
 		var hasUnsetProxy atomic.Bool
-		return netutil.ListenTCPAndServeWithCallback(ctx, addr, connHandler, func(_ net.Listener) {
+		return netutil.ListenTCPAndServeWithListenerCallback(ctx, addr, connHandler, func(net.Listener) {
 			if s.httpSOCKS.SystemProxy {
 				log.Info("try to set the system proxy")
 				// do not use the 'host' variable directly because we changed it for '::'

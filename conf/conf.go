@@ -39,18 +39,20 @@ type Password struct {
 type Hg struct {
 	Host                      string          `json:"host" validate:"ip|hostname_rfc1123"`
 	Password                  Password        `json:"password" validate:"required"`
+	TCPPort                   int             `json:"tcp-port" validate:"gte=0,lte=65536"`
 	TLSPort                   int             `json:"tls-port" validate:"gte=0,lte=65536"`
 	TLSCertKeyPair            *TLSCertKeyPair `json:"tls-cert-key-pair"`
 	TLSBadAuthFallbackSiteDir string          `json:"tls-bad-auth-fallback-site-dir"`
-	TCPPort                   int             `json:"tcp-port" validate:"gte=0,lte=65536"`
+	QUICPort                  int             `json:"quic-port" validate:"gte=0,lte=65536"`
 }
 
 type ProxyNode struct {
 	Host        string   `json:"host" validate:"ip|hostname_rfc1123"`
 	Password    Password `json:"password" validate:"required"`
+	TCPPort     int      `json:"tcp-port" validate:"gte=0,lte=65536"`
 	TLSPort     int      `json:"tls-port" validate:"gte=0,lte=65536"`
 	TLSCertFile string   `json:"tls-cert"`
-	TCPPort     int      `json:"tcp-port" validate:"gte=0,lte=65536"`
+	QUICPort    int      `json:"quic-port" validate:"gte=0,lte=65536"`
 }
 
 type Route struct {
@@ -112,9 +114,12 @@ func (rules Rules) CopyWithNewRulesData() (Rules, error) {
 	return newRules, nil
 }
 
-const defaultHTTPSOCKSPort = 1080
-const defaultTLSPort = 443
-const defaultProfilingPort = 6060
+const (
+	defaultHTTPSOCKSPort = 1080
+	defaultTLSPort       = 443
+	defaultQUICPort      = 443
+	defaultProfilingPort = 6060
+)
 
 func (httpSOCKS *HTTPSOCKS) UnmarshalJSON(data []byte) error {
 	// https://stackoverflow.com/a/41102996
@@ -128,6 +133,7 @@ func (hg *Hg) UnmarshalJSON(data []byte) error {
 	type HgAlias Hg
 	hgAlias := (*HgAlias)(hg)
 	hgAlias.TLSPort = defaultTLSPort
+	hgAlias.QUICPort = defaultQUICPort
 	return json.Unmarshal(data, hgAlias)
 }
 
@@ -135,6 +141,7 @@ func (node *ProxyNode) UnmarshalJSON(data []byte) error {
 	type ProxyNodeAlias ProxyNode
 	proxyNodeAlias := (*ProxyNodeAlias)(node)
 	proxyNodeAlias.TLSPort = defaultTLSPort
+	proxyNodeAlias.QUICPort = defaultQUICPort
 	return json.Unmarshal(data, proxyNodeAlias)
 }
 

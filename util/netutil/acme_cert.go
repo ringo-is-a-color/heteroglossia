@@ -1,4 +1,4 @@
-package tr_carrier
+package netutil
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
-	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -18,7 +17,7 @@ func tlsConfigWithAutomatedCertificate(ctx context.Context, host string) *tls.Co
 		RenewBefore: 10 * 24 * time.Hour,
 	}
 	go func() {
-		err := netutil.ListenHTTPAndServe(ctx, ":80", certManager.HTTPHandler(nil))
+		err := ListenHTTPAndServe(ctx, ":80", certManager.HTTPHandler(nil))
 		if err != nil {
 			log.Fatal("fail to start a HTTP server for automatic renewing certificate", err)
 		}

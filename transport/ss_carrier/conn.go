@@ -32,10 +32,10 @@ type conn struct {
 	readerBuf    []byte
 	aeadOverhead int
 
-	isClient            bool
-	hasWriteFirstPacket bool
-	hasReadFirstPacket  bool
-	serverSideSaltPool  *saltPool[string]
+	isClient             bool
+	hasWriteFirstPayload bool
+	hasReadFirstPayload  bool
+	serverSideSaltPool   *saltPool[string]
 }
 
 var _ net.Conn = new(conn)
@@ -100,7 +100,7 @@ func (c *conn) Write(p []byte) (n int, err error) {
 	return int(count), err
 }
 
-func (c *conn) writeClientFirstPacket(payload []byte) (int, error) {
+func (c *conn) writeClientFirstPayload(payload []byte) (int, error) {
 	payloadSize := len(payload)
 	var paddingSize, reqPaddingAndPayloadSize int
 	if payloadSize <= 0 {
@@ -183,7 +183,7 @@ First response stream
 | 16/32B |    27/43B + 16B tag    | variable length + 16B tag |
 +--------+------------------------+---------------------------+
 */
-func (c *conn) writeServerFirstPacket(payload []byte) (int, error) {
+func (c *conn) writeServerFirstPayload(payload []byte) (int, error) {
 	saltSize := len(c.preSharedKey)
 	payloadSize := len(payload)
 	respPayloadEncryptedStart := saltSize + reqFixedLenHeaderSize + saltSize + c.aeadOverhead
@@ -242,14 +242,14 @@ func (c *conn) Read(b []byte) (n int, err error) {
 }
 
 func (c *conn) readOrWriteTo(b []byte, w io.Writer) (n int, err error) {
-	if c.isClient && !c.hasReadFirstPacket {
-		c.hasReadFirstPacket = true
-		return c.readServerFirstPacket(b, w)
+	if c.isClient && !c.hasReadFirstPayload {
+		c.hasReadFirstPayload = true
+		return c.readServerFirstPayload(b, w)
 	}
 
 	if len(c.readerBuf) != 0 {
 		if w != nil {
-			n, err := w.Write(c.readerBuf)
+			n, err := ioutil.Write(w, c.readerBuf)
 			c.readerBuf = c.readerBuf[n:]
 			return n, err
 		}
@@ -288,13 +288,13 @@ func (c *conn) readOrWriteTo(b []byte, w io.Writer) (n int, err error) {
 		return 0, err
 	}
 	if w != nil {
-		return w.Write(payloadEncryptedBs[:payloadSize])
+		return ioutil.Write(w, payloadEncryptedBs[:payloadSize])
 	}
 	return c.copyReadPayload(b, payloadEncryptedBs[:payloadSize])
 }
 
-func (c *conn) readServerFirstPacket(b []byte, w io.Writer) (int, error) {
-	c.hasReadFirstPacket = true
+func (c *conn) readServerFirstPayload(b []byte, w io.Writer) (int, error) {
+	c.hasReadFirstPayload = true
 	saltSize := len(c.preSharedKey)
 	respSaltWithFixedLenHeaderEncryptedBs := pool.Get(saltSize + reqFixedLenHeaderSize + saltSize + c.aeadOverhead)
 	defer pool.Put(respSaltWithFixedLenHeaderEncryptedBs)
@@ -330,13 +330,13 @@ func (c *conn) readServerFirstPacket(b []byte, w io.Writer) (int, error) {
 		return 0, err
 	}
 	if w != nil {
-		return w.Write(respPayloadEncryptedBs[:respPayloadSize])
+		return ioutil.Write(w, respPayloadEncryptedBs[:respPayloadSize])
 	}
 	return c.copyReadPayload(b, respPayloadEncryptedBs[:respPayloadSize])
 }
 
-func (c *conn) readClientFirstPacket() error {
-	c.hasReadFirstPacket = true
+func (c *conn) readClientFirstPayload() error {
+	c.hasReadFirstPayload = true
 	var err error
 	defer func() {
 		if err != nil {
@@ -482,17 +482,17 @@ func (c *conn) ReadFrom(r io.Reader) (n int64, err error) {
 	maxPayloadReadBs := pool.Get(maxPayloadReadSize)
 	defer pool.Put(maxPayloadReadBs)
 
-	if !c.hasWriteFirstPacket {
-		c.hasWriteFirstPacket = true
+	if !c.hasWriteFirstPayload {
+		c.hasWriteFirstPayload = true
 		count, err := r.Read(maxPayloadReadBs)
 		n += int64(count)
 		if err != nil && !errors.IsIoEof(err) {
 			return n, err
 		}
 		if c.isClient {
-			_, err = c.writeClientFirstPacket(maxPayloadReadBs[:count])
+			_, err = c.writeClientFirstPayload(maxPayloadReadBs[:count])
 		} else {
-			_, err = c.writeServerFirstPacket(maxPayloadReadBs[:count])
+			_, err = c.writeServerFirstPayload(maxPayloadReadBs[:count])
 		}
 		if err != nil {
 			return n, err

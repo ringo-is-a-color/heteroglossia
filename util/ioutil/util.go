@@ -65,9 +65,13 @@ func ReadStringByUint8(r io.Reader) (string, error) {
 	return string(bs), err
 }
 
+func Write(w io.Writer, response []byte) (int, error) {
+	return errors.WithStack2(w.Write(response))
+}
+
 func Write_(w io.Writer, response []byte) error {
-	_, err := w.Write(response)
-	return errors.WithStack(err)
+	_, err := Write(w, response)
+	return err
 }
 
 func Pipe(a, b io.ReadWriteCloser) error {

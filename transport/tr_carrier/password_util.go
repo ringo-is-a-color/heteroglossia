@@ -3,11 +3,16 @@ package tr_carrier
 import (
 	"crypto/sha256"
 	"encoding/hex"
+
+	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
+	"github.com/ringo-is-a-color/heteroglossia/util/log"
 )
 
-const cr = '\r'
-const lf = '\n'
-const escapedLF = lf + 1
+const (
+	cr        = '\r'
+	lf        = '\n'
+	escapedLF = lf + 1
+)
 
 func replaceCRLF(passwordRaw [16]byte) [16]byte {
 	var newPw [16]byte
@@ -31,7 +36,10 @@ func replaceCRLF(passwordRaw [16]byte) [16]byte {
 func toTrojanPassword(password string) [56]byte {
 	var key [56]byte
 	hash := sha256.New224()
-	hash.Write([]byte(password))
+	err := ioutil.Write_(hash, []byte(password))
+	if err != nil {
+		log.Fatal("unexpected code path", err)
+	}
 	hex.Encode(key[:], hash.Sum(nil))
 	return key
 }

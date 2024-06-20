@@ -28,5 +28,5 @@ func HTTPClientThroughRouter(client Client) *http.Client {
 		}
 		return client.Dial(ctx, network, addrStr)
 	}
-	return &http.Client{Transport: tr}
+	return netutil.HTTPClient(tr)
 }

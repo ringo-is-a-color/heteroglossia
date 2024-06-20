@@ -6,7 +6,8 @@
       "tls-bad-auth-fallback-site-dir": "misc/site",
       "tls-cert-key-pair": "misc/tls_test_cert.pem misc/tls_test_key.pem",
       "tls-port": 1082,
-      "tcp-port": 1083
+      "tcp-port": 1083,
+      "quic-port": 1083
     }
   },
   "misc": {

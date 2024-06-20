@@ -14,15 +14,15 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 )
 
-type server struct {
+type Server struct {
 	authInfo     *conf.HTTPSOCKSAuthInfo
 	targetClient transport.Client
 }
 
-var _ transport.Server = new(server)
+var _ transport.Server = new(Server)
 
-func NewServer(authInfo *conf.HTTPSOCKSAuthInfo, targetClient transport.Client) transport.Server {
-	return &server{authInfo, targetClient}
+func NewServer(authInfo *conf.HTTPSOCKSAuthInfo, targetClient transport.Client) *Server {
+	return &Server{authInfo, targetClient}
 }
 
 // see https://www.mnot.net/blog/2011/07/11/what_proxies_must_do point 1
@@ -37,11 +37,11 @@ var connectSuccessBytes = []byte("HTTP/1.1 200 OK\r\n\r\n")
 // forked from https://github.com/database64128/shadowsocks-go/blob/88c2d63ccd0b022f76902195ceb1559eaf15a3a7/http/server.go
 // always consider connection persistent and take little care of HTTP connection header to make the impl simper
 
-func (s *server) ListenAndServe(_ context.Context) error {
+func (s *Server) ListenAndServe(context.Context) error {
 	panic("not implemented")
 }
 
-func (s *server) Serve(ctx context.Context, conn net.Conn) error {
+func (s *Server) Serve(ctx context.Context, conn net.Conn) error {
 	buf := pool.Get(ioutil.BufSize)
 	defer pool.Put(buf)
 	connBufReader := ioutil.NewBufioReader(buf, conn)
