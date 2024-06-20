@@ -42,9 +42,8 @@ const (
 	connectionReserved            byte = 0
 )
 
-// https://www.rfc-editor.org/rfc/rfc1928
-
 /*
+https://www.rfc-editor.org/rfc/rfc1928
 Client Hello
 
 Request
@@ -61,14 +60,13 @@ Response
 | 1  |   1    |
 +----+--------+
 */
-
 var (
 	helloNoAuthBytes              = []byte{Sock5Version, helloNoAuthRequired}
 	helloUsernamePasswordBytes    = []byte{Sock5Version, helloUsernamePassword}
 	helloNoAcceptableMethodsBytes = []byte{Sock5Version, helloNoAcceptableMethods}
 )
 
-func (s *Server) ListenAndServe(ctx context.Context) error {
+func (s *Server) ListenAndServe(context.Context) error {
 	panic("no implemented")
 }
 
@@ -184,7 +182,7 @@ var connectionCommandNotSupportedBytes = []byte{Sock5Version, connectionCommandN
 
 // According to the rfc1928, we need to return the source address/port that SOCKS5 server used to connect to the target host,
 // but we just return dummy values here as these values are not useful to a client and some SOCKS5 server returns the dummy values.
-// See https://stackoverflow.com/q/43013695, https://stackoverflow.com/q/39990056, https://stackoverflow.com/q/72753182
+// See https://stackoverflow.com/q/43013695, https://stackoverflow.com/q/39990056 and https://stackoverflow.com/q/72753182
 var connectionSucceededPrefix = []byte{Sock5Version, connectionSucceeded, connectionReserved,
 	1, 0, 0, 0, 0, 0, 0}
 

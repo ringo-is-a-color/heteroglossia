@@ -57,12 +57,14 @@ func (c *conn) Write(p []byte) (n int, err error) {
 	return ioutil.Write(c.Stream, p)
 }
 
-// https://github.com/EAimTY/tuic/blob/dev/SPEC.md#authenticate
-// +----------+
-// |   ADDR   |
-// +----------+
-// | Variable |
-// +----------+
+/*
+https://github.com/EAimTY/tuic/blob/dev/SPEC.md#authenticate
++----------+
+|   ADDR   |
++----------+
+| Variable |
++----------+
+*/
 func (c *conn) writeConnectCommand() (int, error) {
 	// 16 + 2 = len(password) + len(CRLF)
 	// we don't write the second CRLF like Trojan protocol
@@ -85,16 +87,17 @@ func (c *conn) connectAddressSizeInBytes() int {
 	return socks.SocksLikeAddrSizeInBytes(c.accessAddr)
 }
 
-// https://github.com/EAimTY/tuic/blob/dev/SPEC.md#address
-// +------+----------+----------+
-// | TYPE |   ADDR   |   PORT   |
-// +------+----------+----------+
-// |  1   | Variable |    2     |
-// +------+----------+----------+
-//
-// * 0x00: fully-qualified domain name
-// * 0x01: IPv4 address
-// * 0x02: IPv6 address
+/*
+https://github.com/EAimTY/tuic/blob/dev/SPEC.md#address
++------+----------+----------+
+| TYPE |   ADDR   |   PORT   |
++------+----------+----------+
+|  1   | Variable |    2     |
++------+----------+----------+
+* 0x00: fully-qualified domain name
+* 0x01: IPv4 address
+* 0x02: IPv6 address
+*/
 func (c *conn) writeConnectAddress(buf *bytes.Buffer) {
 	socks.WriteSocksLikeAddr(buf, c.accessAddr)
 	bufBs := buf.Bytes()

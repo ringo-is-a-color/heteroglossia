@@ -12,7 +12,6 @@ import (
 // If the time difference is within 30 seconds, then the salt is checked
 // against all stored salts. If no repeated salt is discovered, then the
 // salt is added to the pool and the session is successfully established.
-
 type saltPool[T comparable] struct {
 	pool        map[T]time.Time
 	lastCleaned time.Time

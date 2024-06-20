@@ -1,4 +1,4 @@
-package test
+package testutil
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestClientServerConnection(t *testing.T, newClient func(serverConf *conf.Config) (transport.Client, error),
+func TestClientServerConnection(t *testing.T, newClient func(proxyNode *conf.ProxyNode) (transport.Client, error),
 	newServer func(hg *conf.Hg, targetClient transport.Client) transport.Server) {
 	serverConf, err := conf.Parse("server_example.conf.json")
 	assert.Nil(t, err)
@@ -25,12 +25,11 @@ func TestClientServerConnection(t *testing.T, newClient func(serverConf *conf.Co
 		err := server.ListenAndServe(ctx)
 		assert.Nil(t, err)
 	}()
-
-	client, err := newClient(serverConf)
+	client, err := newClient(toProxyNode(serverConf.Inbounds.Hg))
 	assert.Nil(t, err)
+
 	server := startWebServer()
 	defer server.Close()
-
 	httpClient := transport.HTTPClientThroughRouter(client)
 	resp, err := httpClient.Get(server.URL)
 
@@ -43,4 +42,15 @@ func startWebServer() *httptest.Server {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	return httptest.NewServer(handler)
+}
+
+func toProxyNode(hg *conf.Hg) *conf.ProxyNode {
+	return &conf.ProxyNode{
+		Host:        hg.Host,
+		Password:    hg.Password,
+		TCPPort:     hg.TCPPort,
+		TLSPort:     hg.TLSPort,
+		TLSCertFile: hg.TLSCertKeyPair.CertFile,
+		QUICPort:    hg.QUICPort,
+	}
 }

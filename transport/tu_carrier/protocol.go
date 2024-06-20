@@ -49,7 +49,6 @@ func authToken(quicConn quic.Connection, password []byte) ([]byte, error) {
 }
 
 const (
-
 	// https://github.com/EAimTY/tuic/blob/dev/SPEC.md#address
 	// The address type can be one of the following:
 	//   o 0xff: None

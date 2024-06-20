@@ -37,7 +37,6 @@ func (c *clientConn) Write(b []byte) (n int, err error) {
 
 /*
 https://trojan-gfw.github.io/trojan/protocol
-
 +-----------------------+---------+----------------+---------+----------+
 | hex(SHA224(password)) |  CRLF   | Trojan Request |  CRLF   | Payload  |
 +-----------------------+---------+----------------+---------+----------+

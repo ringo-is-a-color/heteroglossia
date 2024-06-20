@@ -5,13 +5,13 @@ import (
 
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
-	"github.com/ringo-is-a-color/heteroglossia/util/test"
+	"github.com/ringo-is-a-color/heteroglossia/util/testutil"
 )
 
 func TestClientServerConnection(t *testing.T) {
-	test.TestClientServerConnection(t, newClient, NewServer)
+	testutil.TestClientServerConnection(t, newClient, NewServer)
 }
 
-func newClient(serverConf *conf.Config) (transport.Client, error) {
-	return NewClient(test.ToProxyNode(serverConf.Inbounds.Hg)), nil
+func newClient(proxyNode *conf.ProxyNode) (transport.Client, error) {
+	return NewClient(proxyNode), nil
 }

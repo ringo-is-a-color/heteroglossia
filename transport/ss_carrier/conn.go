@@ -67,7 +67,6 @@ const (
 
 /*
 https://github.com/Shadowsocks-NET/shadowsocks-specs/blob/main/2022-1-shadowsocks-2022-edition.md#312-format
-
 Request stream
 +--------+------------------------+---------------------------+------------------------+---------------------------+---+
 |  salt  | encrypted header chunk |  encrypted header chunk   | encrypted length chunk |  encrypted payload chunk  |...|
