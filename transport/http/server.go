@@ -53,7 +53,7 @@ func (s *Server) Serve(ctx context.Context, conn net.Conn) error {
 	isHTTPConnect := req.Method == http.MethodConnect
 	var addr *transport.SocketAddress
 	if isHTTPConnect {
-		// https://www.rfc-editor.org/rfc/rfc9110#name-connect
+		// https://datatracker.ietf.org/doc/html/rfc9110#name-connect
 		// There is no default port; a client MUST send the port number
 		// even if the CONNECT request is based on a URI reference that
 		// contains an authority component with an elided port.
@@ -112,7 +112,7 @@ func (s *Server) Serve(ctx context.Context, conn net.Conn) error {
 				break
 			}
 
-			// https://www.rfc-editor.org/rfc/rfc9110#name-connect
+			// https://datatracker.ietf.org/doc/html/rfc9110#name-connect
 			// A tunnel is closed when a tunnel intermediary detects that either side has closed its connection:
 			// the intermediary MUST attempt to send any outstanding data that came from the closed side to the other side,
 			// close both connections, and then discard any remaining data left undelivered.

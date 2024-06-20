@@ -106,8 +106,7 @@ func (s *Server) handleClientHelloRequest(ctx context.Context, conn net.Conn) er
 }
 
 /*
-https://datatracker.ietf.org/doc/rfc1929
-
+https://datatracker.ietf.org/doc/html/rfc1929
 Client Authentication
 
 Request
