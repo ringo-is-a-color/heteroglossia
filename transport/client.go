@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
@@ -26,6 +27,8 @@ func HTTPClientThroughRouter(client Client) *http.Client {
 		if err != nil {
 			return nil, err
 		}
+
+		ctx = contextutil.WithSourceAndInboundValues(ctx, "hg binary itself", "internal HTTP Client")
 		return client.Dial(ctx, network, addrStr)
 	}
 	return netutil.HTTPClient(tr)

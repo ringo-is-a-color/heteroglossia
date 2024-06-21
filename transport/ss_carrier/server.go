@@ -7,6 +7,7 @@ import (
 
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
+	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
 	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
@@ -31,6 +32,7 @@ func NewServer(hg *conf.Hg, targetClient transport.Client) transport.Server {
 func (s *server) ListenAndServe(ctx context.Context) error {
 	addr := ":" + strconv.Itoa(s.hg.TCPPort)
 	return netutil.ListenTCPAndServe(ctx, addr, func(conn *net.TCPConn) {
+		ctx = contextutil.WithSourceAndInboundValues(ctx, conn.RemoteAddr().String(), "TCP carrier")
 		err := s.Serve(ctx, conn)
 		_ = conn.Close()
 		if err != nil {

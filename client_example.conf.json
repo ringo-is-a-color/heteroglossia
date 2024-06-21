@@ -12,10 +12,10 @@
     "node1": {
       "host": "localhost",
       "password": "66cac28e26cd4d6faf944821c702fadb",
-      "tcp-port": 1081,
-      "tls-port": 1082,
+      "tcp-port": 2081,
+      "tls-port": 2082,
       "tls-cert": "misc/tls_test_cert.pem",
-      "quic-port": 1083
+      "quic-port": 2083
     },
     "node2": {
       "host": "example.org",

@@ -11,6 +11,7 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
+	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
 	"github.com/ringo-is-a-color/heteroglossia/util/ioutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
@@ -50,6 +51,7 @@ func (s *server) ListenAndServe(ctx context.Context) error {
 
 	// TODO: tlsBadAuthFallbackServerPort
 	return netutil.ListenQUICAndAccept(ctx, s.hg.QUICPort, s.tlsConfig, quicServerConfig, func(quicConn quic.Connection) {
+		ctx = contextutil.WithSourceAndInboundValues(ctx, quicConn.RemoteAddr().String(), "QUIC carrier")
 		ctx, cancel := context.WithCancel(ctx)
 		serverConn := &serverConn{s, quicConn, make(chan struct{}), ctx, cancel}
 		go serverConn.handleAuthTimeout()
