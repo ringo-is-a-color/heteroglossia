@@ -17,24 +17,25 @@ import (
 )
 
 var (
-	tlsClientConfigCreateMutex sync.Mutex
-	tlsClientConfigInstance    *tls.Config
+	tlsClientConfigMap      = make(map[string]*tls.Config)
+	tlsClientConfigMapMutex sync.Mutex
 
-	tlsServerConfigCreateMutex sync.Mutex
-	tlsServerConfigInstance    *tls.Config
+	tlsServerConfigMap      = make(map[string]*tls.Config)
+	tlsServerConfigMapMutex sync.Mutex
 )
 
 const tlsKeyLogFilepath = "logs/tls_key.log"
 
 func TLSClientConfig(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*tls.Config, error) {
-	tlsClientConfigCreateMutex.Lock()
-	defer tlsClientConfigCreateMutex.Unlock()
-	if tlsClientConfigInstance != nil {
-		return tlsClientConfigInstance, nil
+	tlsClientConfigMapMutex.Lock()
+	defer tlsClientConfigMapMutex.Unlock()
+	tlsConfig, ok := tlsClientConfigMap[proxyNode.Host]
+	if ok {
+		return tlsConfig, nil
 	}
 
 	if proxyNode.TLSCertFile == "" {
-		tlsClientConfigInstance = &tls.Config{ServerName: proxyNode.Host}
+		tlsConfig = &tls.Config{ServerName: proxyNode.Host}
 	} else {
 		certBs, err := ioutil.ReadFile(proxyNode.TLSCertFile)
 		if err != nil {
@@ -54,12 +55,11 @@ func TLSClientConfig(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*tls.Config, er
 			return nil, errors.New(err, "no DNSNames in the TLS certificate")
 		}
 		certPool.AppendCertsFromPEM(certBs)
-		tlsClientConfigInstance = &tls.Config{
+		tlsConfig = &tls.Config{
 			RootCAs:    certPool,
 			ServerName: cert.DNSNames[0],
 		}
 	}
-
 	if tlsKeyLog {
 		err := os.MkdirAll(path.Dir(tlsKeyLogFilepath), 0700)
 		if err != nil {
@@ -69,34 +69,42 @@ func TLSClientConfig(proxyNode *conf.ProxyNode, tlsKeyLog bool) (*tls.Config, er
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
-		tlsClientConfigInstance.KeyLogWriter = tlsKeyLogFile
-		osutil.RegisterProgramTerminationHandler(func() {
-			err := os.Remove(tlsKeyLogFilepath)
-			if err != nil {
-				log.WarnWithError("fail to remove the file", err, "path", tlsKeyLogFilepath)
-			}
-		})
+		tlsConfig.KeyLogWriter = tlsKeyLogFile
+
+		if len(tlsClientConfigMap) == 0 {
+			osutil.RegisterProgramTerminationHandler(func() {
+				err := os.Remove(tlsKeyLogFilepath)
+				if err != nil {
+					log.WarnWithError("fail to remove the file", err, "path", tlsKeyLogFilepath)
+				}
+			})
+		}
 	}
-	return tlsClientConfigInstance, nil
+
+	tlsClientConfigMap[proxyNode.Host] = tlsConfig
+	return tlsConfig, nil
 }
 
 func TLSServerConfig(hg *conf.Hg) (*tls.Config, error) {
-	tlsServerConfigCreateMutex.Lock()
-	defer tlsServerConfigCreateMutex.Unlock()
-	if tlsServerConfigInstance != nil {
-		return tlsServerConfigInstance, nil
+	tlsServerConfigMapMutex.Lock()
+	defer tlsServerConfigMapMutex.Unlock()
+	tlsConfig, ok := tlsServerConfigMap[hg.Host]
+	if ok {
+		return tlsConfig, nil
 	}
 
 	if hg.TLSCertKeyPair == nil {
 		// use context.Background() for reusing the same tls.Config for different server types,
 		// otherwise cancel one context can stop tls.Config used by others
-		tlsServerConfigInstance = tlsConfigWithAutomatedCertificate(context.Background(), hg.Host)
+		tlsConfig = tlsConfigWithAutomatedCertificate(context.Background(), hg.Host)
 	} else {
 		cert, err := tls.LoadX509KeyPair(hg.TLSCertKeyPair.CertFile, hg.TLSCertKeyPair.KeyFile)
 		if err != nil {
 			return nil, errors.New(err, "fail to load TLS Certificate/Key pair files")
 		}
-		tlsServerConfigInstance = &tls.Config{Certificates: []tls.Certificate{cert}}
+		tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}
-	return tlsServerConfigInstance, nil
+
+	tlsServerConfigMap[hg.Host] = tlsConfig
+	return tlsConfig, nil
 }
