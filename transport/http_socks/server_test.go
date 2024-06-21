@@ -39,7 +39,7 @@ func TestProxyConnectionHandle(t *testing.T) {
 		proxyProtocolPrefix string
 	}{
 		{"HTTP", "http://"},
-		{"Socks5", "socks5h://"},
+		{"SOCK5", "socks5h://"},
 	}
 
 	for _, i := range proxyProtocolInfo {

@@ -28,3 +28,9 @@ The time of the client's system cannot differ from the server's by more than hal
 
 If you configure an IPv6 address with authentication info for HTTP inbound, the hg won't be able to configure this as a
 system proxy due to a KDE bug.
+
+## App-Level
+
+### Firefox
+If you use Firefox with system proxy, open `about:config` page in it, configure `network.proxy.default_pac_script_socks_version`
+to `5` because hg doesn't support SOCKS4. You can also change `network.proxy.socks_remote_dns` to `true` for better security.

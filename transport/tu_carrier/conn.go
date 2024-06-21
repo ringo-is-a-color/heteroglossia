@@ -84,7 +84,7 @@ func (c *conn) writeConnectCommand() (int, error) {
 }
 
 func (c *conn) connectAddressSizeInBytes() int {
-	return socks.SocksLikeAddrSizeInBytes(c.accessAddr)
+	return socks.SOCKSLikeAddrSizeInBytes(c.accessAddr)
 }
 
 /*
@@ -99,7 +99,7 @@ https://github.com/EAimTY/tuic/blob/dev/SPEC.md#address
 * 0x02: IPv6 address
 */
 func (c *conn) writeConnectAddress(buf *bytes.Buffer) {
-	socks.WriteSocksLikeAddr(buf, c.accessAddr)
+	socks.WriteSOCKSLikeAddr(buf, c.accessAddr)
 	bufBs := buf.Bytes()
 	switch c.accessAddr.AddrType {
 	case transport.IPv4:

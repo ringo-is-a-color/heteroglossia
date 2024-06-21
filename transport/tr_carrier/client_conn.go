@@ -54,7 +54,7 @@ func (c *clientConn) writeClientFirstPayload(payload []byte) (int, error) {
 	buf := bytes.NewBuffer(firstPayloadBs[:0])
 	buf.Write(c.passwordWithCRLF[:])
 	buf.Write(crlf)
-	writeSocksLikeConnectionCommandRequest(buf, c.accessAddr)
+	writeSOCKSLikeConnectionCommandRequest(buf, c.accessAddr)
 	buf.Write(payload)
 
 	count, err := buf.WriteTo(c.Conn)
@@ -102,10 +102,10 @@ SOCKS5-like request
 */
 
 func socksLikeRequestSizeInBytes(addr *transport.SocketAddress) int {
-	return 1 + socks.SocksLikeAddrSizeInBytes(addr)
+	return 1 + socks.SOCKSLikeAddrSizeInBytes(addr)
 }
 
-func writeSocksLikeConnectionCommandRequest(buf *bytes.Buffer, addr *transport.SocketAddress) {
+func writeSOCKSLikeConnectionCommandRequest(buf *bytes.Buffer, addr *transport.SocketAddress) {
 	buf.WriteByte(socks.ConnectionCommandConnect)
-	socks.WriteSocksLikeAddr(buf, addr)
+	socks.WriteSOCKSLikeAddr(buf, addr)
 }

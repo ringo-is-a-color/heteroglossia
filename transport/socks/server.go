@@ -24,8 +24,8 @@ func NewServer(authInfo *conf.HTTPSOCKSAuthInfo, targetClient transport.Client) 
 }
 
 const (
-	Sock4Version byte = 4
-	Sock5Version byte = 5
+	SOCKS4Version byte = 4
+	SOCKS5Version byte = 5
 
 	helloNoAuthRequired      byte = 0
 	helloUsernamePassword    byte = 2
@@ -61,9 +61,9 @@ Response
 +----+--------+
 */
 var (
-	helloNoAuthBytes              = []byte{Sock5Version, helloNoAuthRequired}
-	helloUsernamePasswordBytes    = []byte{Sock5Version, helloUsernamePassword}
-	helloNoAcceptableMethodsBytes = []byte{Sock5Version, helloNoAcceptableMethods}
+	helloNoAuthBytes              = []byte{SOCKS5Version, helloNoAuthRequired}
+	helloUsernamePasswordBytes    = []byte{SOCKS5Version, helloUsernamePassword}
+	helloNoAcceptableMethodsBytes = []byte{SOCKS5Version, helloNoAcceptableMethods}
 )
 
 func (s *Server) ListenAndServe(context.Context) error {
@@ -176,13 +176,13 @@ Response
 +----+-----+-------+------+----------+----------+
 */
 
-var connectionCommandNotSupportedBytes = []byte{Sock5Version, connectionCommandNotSupported, connectionReserved,
+var connectionCommandNotSupportedBytes = []byte{SOCKS5Version, connectionCommandNotSupported, connectionReserved,
 	connectionAddressIpv4, 0, 0, 0, 0, 0}
 
 // According to the rfc1928, we need to return the source address/port that SOCKS5 server used to connect to the target host,
 // but we just return dummy values here as these values are not useful to a client and some SOCKS5 server returns the dummy values.
 // See https://stackoverflow.com/q/43013695, https://stackoverflow.com/q/39990056 and https://stackoverflow.com/q/72753182
-var connectionSucceededPrefix = []byte{Sock5Version, connectionSucceeded, connectionReserved,
+var connectionSucceededPrefix = []byte{SOCKS5Version, connectionSucceeded, connectionReserved,
 	1, 0, 0, 0, 0, 0, 0}
 
 func (s *Server) handleClientConnectionRequest(ctx context.Context, conn net.Conn) error {
@@ -190,7 +190,7 @@ func (s *Server) handleClientConnectionRequest(ctx context.Context, conn net.Con
 	if err != nil {
 		return err
 	}
-	if bs[0] != Sock5Version {
+	if bs[0] != SOCKS5Version {
 		return errors.Newf("SOCKS%v protocol is not supported, only SOCKS5 is supported", bs[0])
 	}
 	if bs[1] != ConnectionCommandConnect {

@@ -17,7 +17,7 @@ SOCKS5-like address
 */
 
 //goland:noinspection GoNameStartsWithPackageName
-func SocksLikeAddrSizeInBytes(addr *transport.SocketAddress) int {
+func SOCKSLikeAddrSizeInBytes(addr *transport.SocketAddress) int {
 	// https://en.wikipedia.org/wiki/SOCKS#SOCKS5
 	// Addr+Port(2)
 	// the address data that follows. Depending on type:
@@ -34,7 +34,7 @@ func SocksLikeAddrSizeInBytes(addr *transport.SocketAddress) int {
 	}
 }
 
-func WriteSocksLikeAddr(buf *bytes.Buffer, addr *transport.SocketAddress) {
+func WriteSOCKSLikeAddr(buf *bytes.Buffer, addr *transport.SocketAddress) {
 	writeAddrType(buf, addr)
 	writeAddrAndPort(buf, addr)
 }

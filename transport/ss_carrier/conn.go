@@ -110,7 +110,7 @@ func (c *conn) writeClientFirstPayload(payload []byte) (int, error) {
 		reqPaddingAndPayloadSize = payloadSize
 	}
 
-	reqPaddingOrPayloadStart := socks.SocksLikeAddrSizeInBytes(c.accessAddr) + lenFieldSize
+	reqPaddingOrPayloadStart := socks.SOCKSLikeAddrSizeInBytes(c.accessAddr) + lenFieldSize
 	reqVarLenHeaderSize := reqPaddingOrPayloadStart + reqPaddingAndPayloadSize
 	saltSize := len(c.preSharedKey)
 	reqVarLenHeaderEncryptedStart := saltSize + reqFixedLenHeaderSize + c.aeadOverhead
@@ -143,7 +143,7 @@ func (c *conn) writeClientFirstPayload(payload []byte) (int, error) {
 	// +------+----------+-------+----------------+----------+-----------------+
 	reqVarLenHeaderBs := reqHeaderEncryptedBs[reqVarLenHeaderEncryptedStart:]
 	reqVarLenHeaderBuf := bytes.NewBuffer(reqVarLenHeaderBs[:0])
-	socks.WriteSocksLikeAddr(reqVarLenHeaderBuf, c.accessAddr)
+	socks.WriteSOCKSLikeAddr(reqVarLenHeaderBuf, c.accessAddr)
 	err = binary.Write(reqVarLenHeaderBuf, binary.BigEndian, uint16(paddingSize))
 	if err != nil {
 		return 0, errors.WithStack(err)
