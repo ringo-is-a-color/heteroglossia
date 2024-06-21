@@ -82,5 +82,5 @@ func hgBinaryURL(version string) string {
 }
 
 func hgBinaryURLSHA256SumURL(version string) string {
-	return hgBinaryURLSHA256SumURLTemplate + version
+	return fmt.Sprintf(hgBinaryURLSHA256SumURLTemplate, version)
 }
