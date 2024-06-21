@@ -38,7 +38,7 @@ func NewServer(httpSOCKS *conf.HTTPSOCKS, targetClient transport.Client) transpo
 func (s *server) ListenAndServe(ctx context.Context) error {
 	// can't listen to IPv4 & IPv6 together due to https://github.com/golang/go/issues/9334
 	// so also listen to IPv4 one when using '::1' or '::'
-	var host = s.httpSOCKS.Host
+	host := s.httpSOCKS.Host
 	connHandler := func(conn *net.TCPConn) {
 		err := s.Serve(ctx, conn)
 		_ = conn.Close()

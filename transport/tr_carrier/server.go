@@ -49,7 +49,7 @@ func (s *server) ListenAndServe(ctx context.Context) error {
 
 	port := make(chan uint16, 1)
 	go func() {
-		var httpHandler http.Handler = nil
+		var httpHandler http.Handler
 		if s.hg.TLSBadAuthFallbackSiteDir != "" {
 			httpHandler = http.FileServer(http.Dir(s.hg.TLSBadAuthFallbackSiteDir))
 		}

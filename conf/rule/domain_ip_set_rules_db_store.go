@@ -66,7 +66,7 @@ func (store *DomainIPSetRulesQueryStore) queryDomainRulesByTag(tag string, consu
 		_ = rows.Close()
 	}(rows)
 
-	var atLeastOneRow = false
+	atLeastOneRow := false
 	var domainTypeID int
 	var domain string
 	for rows.Next() {
@@ -104,7 +104,7 @@ func (store *DomainIPSetRulesQueryStore) queryIpSetRulesByTag(tag string, consum
 		_ = rows.Close()
 	}(rows)
 
-	var atLeastOneRow = false
+	atLeastOneRow := false
 	var cidrTypeID int
 	var cidrs []byte
 	for rows.Next() {

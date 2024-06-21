@@ -18,11 +18,12 @@ import (
 )
 
 type client struct {
-	route             *conf.Route
-	routeRulesRWMutex *sync.RWMutex
-	outbounds         map[string]*conf.ProxyNode
-	tlsKeyLog         bool
-	httpClient        *http.Client
+	route        *conf.Route
+	routeRWMutex *sync.RWMutex
+	outbounds    map[string]*conf.ProxyNode
+	tlsKeyLog    bool
+
+	httpClient *http.Client
 }
 
 var _ transport.Client = new(client)
@@ -39,7 +40,7 @@ func NewClient(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[string
 }
 
 func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
-	c.routeRulesRWMutex.RLock()
+	c.routeRWMutex.RLock()
 	err := netutil.ValidateTCP(network)
 	if err != nil {
 		return nil, err
@@ -62,7 +63,7 @@ func (c *client) Dial(ctx context.Context, network string, addr *transport.Socke
 			}
 		}
 	}
-	c.routeRulesRWMutex.RUnlock()
+	c.routeRWMutex.RUnlock()
 	if policy == "final" || policy == "" {
 		policy = c.route.Final
 	}
@@ -96,17 +97,17 @@ func (c *client) updateRoute() {
 		return
 	}
 
-	c.routeRulesRWMutex.RLock()
+	c.routeRWMutex.RLock()
 	newRules, err := c.route.Rules.CopyWithNewRulesData()
 	if err != nil {
-		c.routeRulesRWMutex.RUnlock()
+		c.routeRWMutex.RUnlock()
 		log.WarnWithError("fail to update rules' 'matcher'", err)
 		return
 	}
-	c.routeRulesRWMutex.RUnlock()
+	c.routeRWMutex.RUnlock()
 
-	c.routeRulesRWMutex.Lock()
+	c.routeRWMutex.Lock()
 	c.route.Rules = newRules
-	c.routeRulesRWMutex.Unlock()
+	c.routeRWMutex.Unlock()
 	log.Info("update rules' files successfully")
 }

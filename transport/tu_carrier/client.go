@@ -73,7 +73,7 @@ func (c *client) newQUICConn(ctx context.Context) (quic.Connection, error) {
 	go func() {
 		err := c.sendAuthenticationCommand(conn)
 		if err != nil {
-			_ = c.quicConn.CloseWithError(authCommandSendErrCode, authCommandSendErrStr)
+			_ = conn.CloseWithError(authCommandSendErrCode, authCommandSendErrStr)
 			c.quicConnMutex.Lock()
 			c.quicConn = nil
 			c.quicConnMutex.Unlock()
