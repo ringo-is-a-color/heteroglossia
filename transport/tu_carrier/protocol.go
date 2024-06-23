@@ -8,32 +8,57 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
 	"github.com/ringo-is-a-color/heteroglossia/util/errors"
+	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 )
 
 const (
-	tuicVersion = 5
+	tuicVersion byte = 5
 
-	authCommandType = 0
-	// needs to be 16 bytes
-	authCommandUUID                  = "EXPORTER_hg_QUIC"
-	authCommandUUIDSize              = len(authCommandUUID)
-	authCommandTokenSize             = 32
-	authCommandDataSize              = authCommandUUIDSize + authCommandTokenSize
+	authCommandType      byte = 0
+	connectCommandType   byte = 0x01
+	heartbeatCommandType byte = 0x04
+
+	// label should begin with 'EXPORTER' according to https://datatracker.ietf.org/doc/html/rfc5705#section-4
+	authCommandUUID      = "EXPORTER_hg_QUIC" // needs to be 16 bytes
+	authCommandUUIDSize  = len(authCommandUUID)
+	authCommandTokenSize = 32
+	authCommandDataSize  = authCommandUUIDSize + authCommandTokenSize
+
 	authCommandSendErrCode           = 0x00
-	authCommandSendErrStr            = "Fail to send authentication command"
+	authCommandSendErrStr            = "Fail to send an authentication command"
 	authCommandReceiveTimeoutErrCode = 0x01
+	connectCommandSendErrCode        = 0x10
+	connectCommandSendErrStr         = "Fail to send a connect command"
+	heartbeatCommandSendErrCode      = 0x40
+	heartbeatCommandSendErrStr       = "Fail to send a heartbeat command"
+	handleUniStreamErrCode           = 0x100
+	handleUniStreamErrStr            = "Fail to handle a unidirectional command"
+	receiveDatagramErrCode           = 0x104
+	receiveDatagramStreamErrStr      = "Fail to receive a datagram"
+	handleDatagramErrCode            = 0x105
+	handleDatagramStreamErrStr       = "Fail to handle a datagram"
+	connectionContextDoneErrCode     = 0x110
+	connectionContextDoneErrStr      = "connection's context is done"
 
-	connectCommandType        = 0x01
-	connectCommandSendErrCode = 0x10
-	connectCommandSendErrStr  = "Fail to send connect command"
-
-	handleUniStreamErrCode = 0x100
-	handleUniStreamErrStr  = "Fail to handle unidirectional command"
+	authTimeout = 7 * time.Second
 )
 
 var (
-	authTimeout                     = 5 * time.Second
 	authCommandReceiveTimeoutErrStr = fmt.Sprintf("fail to receive authentication command in %v", authTimeout)
+	heartbeatInterval               = netutil.KeepAlive
+
+	quicClientConfig = &quic.Config{
+		EnableDatagrams:       true,
+		MaxIncomingUniStreams: 1 << 60,
+		MaxIdleTimeout:        netutil.IdleTimeout,
+	}
+
+	quicServerConfig = &quic.Config{
+		EnableDatagrams:       true,
+		MaxIncomingStreams:    1 << 60,
+		MaxIncomingUniStreams: 1 << 60,
+		MaxIdleTimeout:        netutil.IdleTimeout,
+	}
 )
 
 func validateVersion(version byte) error {

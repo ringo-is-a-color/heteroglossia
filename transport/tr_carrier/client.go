@@ -31,12 +31,7 @@ func NewClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (transport.Client, err
 	return clientHandler, nil
 }
 
-func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
-	err := netutil.ValidateTCP(network)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *client) DialTCP(ctx context.Context, addr *transport.SocketAddress) (net.Conn, error) {
 	targetHostWithPort := c.proxyNode.Host + ":" + strconv.Itoa(c.proxyNode.TLSPort)
 	tlsConn, err := netutil.DialTLS(ctx, targetHostWithPort, c.tlsConfig)
 	if err != nil {

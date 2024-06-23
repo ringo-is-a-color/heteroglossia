@@ -14,36 +14,36 @@ import (
 )
 
 // forked from https://github.com/cloudflare/cloudflared/blob/354a5bb8afb16be9fa260c4eb28d4d1778f655bc/quic/safe_stream.go
-type conn struct {
+type tcpConn struct {
 	quicConn quic.Connection
 	quic.Stream
-	localAddr  net.Addr
-	remoteAddr net.Addr
 	accessAddr *transport.SocketAddress
 
 	writeLock                 sync.Mutex
 	needToWriteConnectCommand bool
+	connCloseCallback         func()
 }
 
-var _ net.Conn = new(conn)
+var _ net.Conn = new(tcpConn)
 
-func newConn(quicConn quic.Connection, quicStream quic.Stream,
-	localAddr, remoteAddr net.Addr, accessAddr *transport.SocketAddress,
-	isClient bool) *conn {
-	return &conn{quicConn: quicConn, Stream: quicStream,
-		localAddr: localAddr, remoteAddr: remoteAddr, accessAddr: accessAddr,
-		needToWriteConnectCommand: isClient}
+func newClientTCPConn(quicConn quic.Connection, quicStream quic.Stream, accessAddr *transport.SocketAddress, connCloseCallback func()) *tcpConn {
+	return &tcpConn{quicConn: quicConn, Stream: quicStream, accessAddr: accessAddr,
+		needToWriteConnectCommand: true, connCloseCallback: connCloseCallback}
 }
 
-func (c *conn) LocalAddr() net.Addr {
-	return c.localAddr
+func newServerTCPConn(quicConn quic.Connection, quicStream quic.Stream, accessAddr *transport.SocketAddress) *tcpConn {
+	return &tcpConn{quicConn: quicConn, Stream: quicStream, accessAddr: accessAddr, needToWriteConnectCommand: false}
 }
 
-func (c *conn) RemoteAddr() net.Addr {
-	return c.remoteAddr
+func (c *tcpConn) LocalAddr() net.Addr {
+	return c.quicConn.LocalAddr()
 }
 
-func (c *conn) Write(p []byte) (n int, err error) {
+func (c *tcpConn) RemoteAddr() net.Addr {
+	return c.quicConn.LocalAddr()
+}
+
+func (c *tcpConn) Write(p []byte) (n int, err error) {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 	if c.needToWriteConnectCommand {
@@ -65,7 +65,7 @@ https://github.com/EAimTY/tuic/blob/dev/SPEC.md#authenticate
 | Variable |
 +----------+
 */
-func (c *conn) writeConnectCommand() (int, error) {
+func (c *tcpConn) writeConnectCommand() (int, error) {
 	// 16 + 2 = len(password) + len(CRLF)
 	// we don't write the second CRLF like Trojan protocol
 	connectCommandSize := 2 + c.connectAddressSizeInBytes()
@@ -83,7 +83,7 @@ func (c *conn) writeConnectCommand() (int, error) {
 	return n, nil
 }
 
-func (c *conn) connectAddressSizeInBytes() int {
+func (c *tcpConn) connectAddressSizeInBytes() int {
 	return socks.SOCKSLikeAddrSizeInBytes(c.accessAddr)
 }
 
@@ -98,7 +98,7 @@ https://github.com/EAimTY/tuic/blob/dev/SPEC.md#address
 * 0x01: IPv4 address
 * 0x02: IPv6 address
 */
-func (c *conn) writeConnectAddress(buf *bytes.Buffer) {
+func (c *tcpConn) writeConnectAddress(buf *bytes.Buffer) {
 	socks.WriteSOCKSLikeAddr(buf, c.accessAddr)
 	bufBs := buf.Bytes()
 	switch c.accessAddr.AddrType {
@@ -111,7 +111,7 @@ func (c *conn) writeConnectAddress(buf *bytes.Buffer) {
 	}
 }
 
-func (c *conn) Close() error {
+func (c *tcpConn) Close() error {
 	// Make sure a possible writer does not block the lock forever. We need it, so we can close the writer
 	// side of the stream safely.
 	_ = c.Stream.SetWriteDeadline(time.Now())

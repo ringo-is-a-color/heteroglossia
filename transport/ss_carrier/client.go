@@ -27,12 +27,7 @@ func NewClient(proxyNode *conf.ProxyNode) transport.Client {
 	return &client{proxyNode, proxyNode.Password.Raw[:], gcmTagOverhead, randutil.WeightedIntN(2)}
 }
 
-func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
-	err := netutil.ValidateTCP(network)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *client) DialTCP(ctx context.Context, addr *transport.SocketAddress) (net.Conn, error) {
 	clientSalt, err := generateSalt(c.preSharedKey)
 	if err != nil {
 		return nil, err

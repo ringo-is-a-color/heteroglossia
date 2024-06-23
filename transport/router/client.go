@@ -13,7 +13,6 @@ import (
 	"github.com/ringo-is-a-color/heteroglossia/transport/tr_carrier"
 	"github.com/ringo-is-a-color/heteroglossia/util/contextutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/log"
-	"github.com/ringo-is-a-color/heteroglossia/util/netutil"
 	"github.com/ringo-is-a-color/heteroglossia/util/updater"
 )
 
@@ -39,13 +38,8 @@ func NewClient(route *conf.Route, autoUpdateRuleFiles bool, outbounds map[string
 	return router
 }
 
-func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
+func (c *client) DialTCP(ctx context.Context, addr *transport.SocketAddress) (net.Conn, error) {
 	c.routeRWMutex.RLock()
-	err := netutil.ValidateTCP(network)
-	if err != nil {
-		return nil, err
-	}
-
 	var policy string
 	switch addr.AddrType {
 	case transport.IPv4, transport.IPv6:
@@ -84,7 +78,7 @@ func (c *client) Dial(ctx context.Context, network string, addr *transport.Socke
 	}
 	log.Info("route", contextutil.SourceTag, ctx.Value(contextutil.SourceTag),
 		contextutil.InboundTag, ctx.Value(contextutil.InboundTag), "access", addr.ToHostStr(), "policy", policy)
-	return nextClient.Dial(ctx, network, addr)
+	return nextClient.DialTCP(ctx, addr)
 }
 
 func (c *client) updateRoute() {

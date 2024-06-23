@@ -11,17 +11,17 @@ import (
 )
 
 var (
-	dialer               = net.Dialer{Timeout: dialerTimeout, KeepAlive: tcpKeepAlive}
+	dialer               = net.Dialer{Timeout: dialerTimeout, KeepAlive: KeepAlive}
 	dialerTimeout        = 10 * time.Second
 	quicHandshakeTimeout = 10 * time.Second
 )
 
-func Dial(ctx context.Context, network, addr string) (net.Conn, error) {
+func dial(ctx context.Context, network, addr string) (net.Conn, error) {
 	return errors.WithStack2(dialer.DialContext(ctx, network, addr))
 }
 
 func DialTCP(ctx context.Context, addr string) (*net.TCPConn, error) {
-	conn, err := Dial(ctx, "tcp", addr)
+	conn, err := dial(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func DialTCP(ctx context.Context, addr string) (*net.TCPConn, error) {
 }
 
 func DialTLS(ctx context.Context, addr string, tlsConfig *tls.Config) (*tls.Conn, error) {
-	conn, err := Dial(ctx, "tcp", addr)
+	conn, err := dial(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}

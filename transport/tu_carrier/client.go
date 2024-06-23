@@ -1,14 +1,12 @@
 package tu_carrier
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"net"
 	"strconv"
 	"sync"
 
-	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/quic-go/quic-go"
 	"github.com/ringo-is-a-color/heteroglossia/conf"
 	"github.com/ringo-is-a-color/heteroglossia/transport"
@@ -21,7 +19,7 @@ type client struct {
 	tlsConfig  *tls.Config
 	quicConfig *quic.Config
 
-	quicConn      quic.Connection
+	quicConn      *clientQUICConn
 	quicConnMutex sync.Mutex
 }
 
@@ -35,12 +33,7 @@ func NewClient(proxyNode *conf.ProxyNode, tlsKeyLog bool) (transport.Client, err
 	return &client{proxyNode: proxyNode, tlsConfig: tlsConfig, quicConfig: quicClientConfig}, nil
 }
 
-func (c *client) Dial(ctx context.Context, network string, addr *transport.SocketAddress) (net.Conn, error) {
-	err := netutil.ValidateTCPorUDP(network)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *client) DialTCP(ctx context.Context, addr *transport.SocketAddress) (net.Conn, error) {
 	c.quicConnMutex.Lock()
 	if c.quicConn == nil || !isActive(c.quicConn) {
 		c.quicConn = nil
@@ -59,50 +52,43 @@ func (c *client) Dial(ctx context.Context, network string, addr *transport.Socke
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return newConn(quicConn, stream, quicConn.LocalAddr(), quicConn.RemoteAddr(), addr, true), nil
+	quicConn.relayingTaskCount.Add(1)
+	return newClientTCPConn(quicConn, stream, addr, func() { quicConn.relayingTaskCount.Add(^uint64(0)) }), nil
 }
 
-func (c *client) newQUICConn(ctx context.Context) (quic.Connection, error) {
+func (c *client) newQUICConn(ctx context.Context) (*clientQUICConn, error) {
 	targetHostWithPort := c.proxyNode.Host + ":" + strconv.Itoa(c.proxyNode.QUICPort)
 	// TODO: https://quic-go.net/docs/quic/transport/#stateless-reset
-	conn, err := netutil.DialQUIC(ctx, targetHostWithPort, c.tlsConfig, c.quicConfig)
+	quicConn, err := netutil.DialQUIC(ctx, targetHostWithPort, c.tlsConfig, c.quicConfig)
 	if err != nil {
 		return nil, err
 	}
 
+	clientQUICConn := &clientQUICConn{client: c, Connection: quicConn}
+	go closeConnWhenParentContextDone(ctx, clientQUICConn)
 	go func() {
-		err := c.sendAuthenticationCommand(conn)
+		err := clientQUICConn.sendAuthenticationCommand()
 		if err != nil {
-			_ = conn.CloseWithError(authCommandSendErrCode, authCommandSendErrStr)
-			c.quicConnMutex.Lock()
-			c.quicConn = nil
-			c.quicConnMutex.Unlock()
+			_ = clientQUICConn.CloseWithError(authCommandSendErrCode, authCommandSendErrStr)
 		}
 	}()
-	return conn, nil
+	go clientQUICConn.sendHeartbeats()
+	return clientQUICConn, nil
 }
 
-func (c *client) sendAuthenticationCommand(quicConn quic.Connection) (err error) {
-	sendStream, err := quicConn.OpenUniStream()
-	if err != nil {
-		return errors.WithStack(err)
+func isActive(quicConn quic.Connection) bool {
+	select {
+	case <-quicConn.Context().Done():
+		return false
+	default:
+		return true
 	}
-	authToken, err := authToken(quicConn, []byte(c.proxyNode.Password.String))
-	if err != nil {
-		return err
-	}
+}
 
-	authBs := pool.Get(1 + 1 + authCommandDataSize)
-	defer pool.Put(authBs)
-	authBuf := bytes.NewBuffer(authBs[:0])
-	authBuf.WriteByte(tuicVersion)
-	authBuf.WriteByte(authCommandType)
-	authBuf.WriteString(authCommandUUID)
-	authBuf.Write(authToken)
-	_, err = authBuf.WriteTo(sendStream)
-	if err != nil {
-		return errors.WithStack(err)
+func closeConnWhenParentContextDone(parent context.Context, quic quic.Connection) {
+	select {
+	case <-parent.Done():
+		_ = quic.CloseWithError(connectionContextDoneErrCode, connectionContextDoneErrStr)
+	case <-quic.Context().Done():
 	}
-	_ = sendStream.Close()
-	return nil
 }
